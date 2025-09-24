@@ -1,0 +1,148 @@
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1 0 auto;
+}
+
+.app-brand {
+  min-height: 48px;
+}
+
+.app-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.category-card .list-group-item {
+  cursor: pointer;
+  border: 0;
+  padding-block: 0.75rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.category-card .list-group-item + .list-group-item {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.category-card .list-group-item.active {
+  background-color: #4a90e2;
+  color: #fff;
+}
+
+.category-card .list-group-item.active .badge {
+  background-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+.category-card .badge {
+  background-color: rgba(74, 144, 226, 0.12);
+  color: #4a90e2;
+}
+
+.video-frame {
+  --guard-top: 52px;
+  --controls-safe-zone: 64px;
+  position: relative;
+  background-color: #000;
+}
+
+.video-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.iframe-guard-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--guard-top);
+  pointer-events: auto;
+  cursor: not-allowed;
+  z-index: 3;
+  background: transparent;
+}
+
+.iframe-play-toggle {
+  position: absolute;
+  top: var(--guard-top);
+  left: 0;
+  right: 0;
+  bottom: var(--controls-safe-zone);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.iframe-play-toggle:disabled {
+  cursor: not-allowed;
+}
+
+.iframe-play-toggle:focus-visible {
+  outline: 2px solid #4a90e2;
+  outline-offset: 2px;
+}
+
+#videoStatus {
+  font-size: 0.85rem;
+}
+
+#videoList {
+  max-height: 100%;
+}
+
+#videoList .list-group-item {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#videoList .list-group-item.active-video {
+  background-color: rgba(74, 144, 226, 0.12);
+}
+
+#videoList .list-group-item:hover {
+  background-color: rgba(74, 144, 226, 0.08);
+}
+
+#videoList .video-title {
+  font-weight: 600;
+}
+
+#videoList .video-category {
+  font-size: 0.825rem;
+  color: #6c757d;
+}
+
+@media (max-width: 991px) {
+  .video-frame {
+    --controls-safe-zone: 78px;
+  }
+}
+
+@media (max-width: 767px) {
+  #videoList,
+  .category-card .list-group {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+}
+
+@media (min-width: 992px) {
+  #videoList,
+  .category-card .list-group {
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
+  }
+}
