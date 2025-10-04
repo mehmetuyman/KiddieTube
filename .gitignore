@@ -2,3 +2,36 @@ node_modules/
 .DS_Store
 npm-debug.log*
 .env
+# Yarn
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs/
+*.log
+
+# OS
+Thumbs.db
+
+# Build
+/dist/
+/build/
+
+# VS Code
+.vscode/
+
+# Env
+.env.*
+
+# Misc
+*.swp
+*.swo
+
+# Coverage
+coverage/
+
+# Others
+*.tgz
+
+# Public assets cache
+public/assets/cache/
