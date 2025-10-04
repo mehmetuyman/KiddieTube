@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kiddie Tube</title>
+  <meta name="theme-color" content="#4a90e2" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+
+<body class="bg-body-secondary text-body">
+  <header class="bg-light border-bottom py-2 shadow-sm">
+    <div class="container-xl d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div class="d-flex align-items-center gap-2 app-brand"> <img src="/assets/logo.png" alt="Kiddie Tube logo"
+          class="app-logo" width="48" height="48" /> <span class="brand-title text-primary">Kiddie Tube</span> </div>
+      <span class="text-muted small">Handpicked videos for happy screen time</span>
+    </div>
+  </header>
+  <main class="py-4">
+    <div class="container-xl">
+      <div class="row g-4 align-items-start">
+        <aside class="col-12 col-lg-3">
+          <div class="card shadow-sm h-100 category-card">
+            <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between">
+              <span>Categories</span> <button class="btn btn-light btn-sm d-lg-none" type="button" id="categoryToggle"
+                data-bs-toggle="collapse" data-bs-target="#categoryCollapse" aria-expanded="false"
+                aria-controls="categoryCollapse"> Show </button> </div>
+            <div id="categoryCollapse" class="collapse show d-lg-block">
+              <div class="list-group list-group-flush" id="categoryList" role="list"></div>
+            </div>
+          </div>
+        </aside>
+        <section class="col-12 col-lg-6">
+          <div class="card shadow-sm mb-4 mb-lg-0">
+            <div class="card-body">
+              <div class="ratio ratio-16x9 bg-black rounded overflow-hidden position-relative video-frame mb-3">
+                <div id="videoPlayer" class="w-100 h-100"></div>
+                <div class="pause-shield"></div>
+                <!-- Guard to block all clicks -->
+                <div class="iframe-guard-full"></div>
+                <!-- Custom pause overlay (optional) -->
+                <!-- <div class="custom-pause-overlay">Paused</div> -->
+              </div>
+
+              <div class="custom-controls">
+                <button id="btnPlay">▶</button>
+                <button id="btnPause">⏸</button>
+                <button id="btnMute">🔇</button>
+                <button id="btnUnmute">🔊</button>
+                <button id="btnFullscreen">⛶</button>
+
+                <!-- Time and progress -->
+                <span id="currentTime">0:00</span>
+                <input type="range" id="progressBar" value="0" min="0" max="100">
+                <span id="duration">0:00</span>
+              </div>
+
+              <h1 class="h4 mb-1" id="videoTitle">Select a video to begin</h1>
+              <p class="text-muted mb-2" id="videoCategory"></p>
+              <span class="badge text-bg-secondary" id="videoStatus">Idle</span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="col-12 col-lg-3">
+          <div class="card h-100 shadow-sm">
+            <div class="card-header bg-primary text-white"> <strong id="listHeading">All Videos</strong> </div>
+            <div class="list-group list-group-flush" id="videoList" role="list"></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/app.js" defer></script>
+</body>
+
+</html>
