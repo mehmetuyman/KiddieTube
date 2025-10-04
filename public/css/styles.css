@@ -128,6 +128,109 @@ main {
   z-index: 9999;
 }
 
+.iframe-guard-full {
+  position: absolute;
+  inset: 0;
+  background: transparent; /* change to rgba(255,0,0,0.2) for debug */
+  z-index: 9999; /* make sure it's above iframe */
+  pointer-events: auto;
+}
+
+.custom-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap; /* better on small screens */
+}
+
+.custom-controls button {
+  background: #222;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  font-size: 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.custom-controls button:hover {
+  background: #444;
+}
+
+.custom-controls button:active {
+  background: #666;
+}
+
+.custom-controls #progressBar {
+  flex: 1;
+  max-width: 300px;
+  appearance: none;
+  height: 6px;
+  border-radius: 4px;
+  background: #555;
+  outline: none;
+  cursor: pointer;
+}
+
+.custom-controls #progressBar::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+
+#progressBar {
+  flex: 1;
+  max-width: 300px;
+  appearance: none;
+  height: 6px;
+  border-radius: 4px;
+  background: #555; /* fallback */
+  outline: none;
+  cursor: pointer;
+}
+
+/* Chrome/Edge/Safari thumb */
+#progressBar::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* Firefox thumb */
+#progressBar::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+
+.pause-shield {
+  position: absolute;
+  inset: 0;
+  background: rgba(165, 150, 150, 0.95) url('/assets/logo_no_bg.png') center/300px no-repeat;
+  z-index: 9998;
+  display: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+.pause-shield.visible {
+  display: block;
+  opacity: 1;
+}
+
+
+
 /* .custom-pause-overlay {
   position: absolute;
   inset: 0; /* cover the whole player */

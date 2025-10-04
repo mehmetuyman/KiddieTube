@@ -12,7 +12,7 @@ const YT_STATES = {
 const YT_PLAYER_VARS = {
   rel: 0,
   modestbranding: 1,
-  controls: 2,
+  controls: 0, // disable youtube controls
   disablekb: 1,
   fs: 0,
   playsinline: 1,
@@ -211,17 +211,91 @@ function handlePlayerReady() {
   } else {
     updateVideoStatus();
   }
+
+  // 🎮 Attach custom controls after the player is ready
+  const btnPlay = document.getElementById('btnPlay');
+  const btnPause = document.getElementById('btnPause');
+  const btnMute = document.getElementById('btnMute');
+  const btnUnmute = document.getElementById('btnUnmute');
+  const btnFullscreen = document.getElementById('btnFullscreen');
+  const progressBar = document.getElementById('progressBar');
+  const currentTimeEl = document.getElementById('currentTime');
+  const durationEl = document.getElementById('duration');
+
+  if (btnPlay) btnPlay.onclick = () => youtubePlayer.playVideo();
+  if (btnPause) btnPause.onclick = () => youtubePlayer.pauseVideo();
+  if (btnMute) btnMute.onclick = () => youtubePlayer.mute();
+  if (btnUnmute) btnUnmute.onclick = () => youtubePlayer.unMute();
+  if (btnFullscreen) btnFullscreen.onclick = () => {
+    const iframe = youtubePlayer.getIframe();
+    if (iframe.requestFullscreen) {
+      iframe.requestFullscreen();
+    } else if (iframe.webkitRequestFullscreen) {
+      iframe.webkitRequestFullscreen();
+    } else if (iframe.msRequestFullscreen) {
+      iframe.msRequestFullscreen();
+    }
+  };
+
+  // Update progress and duration
+  setInterval(() => {
+    if (youtubePlayer && youtubePlayer.getDuration) {
+      const duration = youtubePlayer.getDuration();
+      const current = youtubePlayer.getCurrentTime();
+
+      if (!isNaN(duration) && duration > 0) {
+        progressBar.max = duration;
+        progressBar.value = current;
+
+        currentTimeEl.textContent = formatTime(current);
+        durationEl.textContent = formatTime(duration);
+
+        // 🔴 Update gradient to simulate YouTube red progress bar
+        const percent = (current / duration) * 100;
+        progressBar.style.background = `linear-gradient(to right, red 0%, red ${percent}%, #555 ${percent}%, #555 100%)`;
+      }
+    }
+  }, 1000);
+
+  // Allow user to seek
+  if (progressBar) {
+    progressBar.addEventListener('input', () => {
+      youtubePlayer.seekTo(progressBar.value, true);
+    });
+  }
+
+  // Helper for time formatting
+  function formatTime(sec) {
+    const minutes = Math.floor(sec / 60);
+    const seconds = Math.floor(sec % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  }
 }
+
 
 function handlePlayerStateChange(event) {
 
-  const pauseOverlay = document.querySelector('.custom-pause-overlay');
+  // const pauseOverlay = document.querySelector('.custom-pause-overlay');
 
-  if (event.data === YT_STATES.PAUSED) {
-    if (pauseOverlay) pauseOverlay.style.display = 'flex';
-  } else {
-    if (pauseOverlay) pauseOverlay.style.display = 'none';
-  }
+  // if (event.data === YT_STATES.PAUSED) {
+  //   if (pauseOverlay) pauseOverlay.style.display = 'flex';
+  // } else {
+  //   if (pauseOverlay) pauseOverlay.style.display = 'none';
+  // }
+
+  // const pauseShield = document.querySelector('.pause-shield');
+
+  // if (event.data === YT_STATES.PAUSED) {
+  //   pauseShield.style.display = 'block';
+  // } else {
+  //   pauseShield.style.display = 'none';
+  // }
+
+  const pauseShield = document.querySelector('.pause-shield');
+  if (event.data === YT_STATES.PAUSED) pauseShield.classList.add('visible');
+  else pauseShield.classList.remove('visible');
+
+
 
   const bottomLeftGuard = document.querySelector('.iframe-guard-bottom-left');
 

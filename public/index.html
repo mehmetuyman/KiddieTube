@@ -43,21 +43,33 @@
             <div class="card-body">
               <div class="ratio ratio-16x9 bg-black rounded overflow-hidden position-relative video-frame mb-3">
                 <div id="videoPlayer" class="w-100 h-100"></div>
-                !-- Guards -->
-                <div class="iframe-guard-top"></div>
-                <div class="iframe-guard-bottom-left"></div>
-                <!-- <div class="iframe-guard-bottom-left2"></div> -->
-                <div class="iframe-guard-bottom-right"></div>
-
-                <!-- Custom pause overlay -->
+                <div class="pause-shield"></div>
+                <!-- Guard to block all clicks -->
+                <div class="iframe-guard-full"></div>
+                <!-- Custom pause overlay (optional) -->
                 <!-- <div class="custom-pause-overlay">Paused</div> -->
               </div>
+
+              <div class="custom-controls">
+                <button id="btnPlay">▶</button>
+                <button id="btnPause">⏸</button>
+                <button id="btnMute">🔇</button>
+                <button id="btnUnmute">🔊</button>
+                <button id="btnFullscreen">⛶</button>
+
+                <!-- Time and progress -->
+                <span id="currentTime">0:00</span>
+                <input type="range" id="progressBar" value="0" min="0" max="100">
+                <span id="duration">0:00</span>
+              </div>
+
               <h1 class="h4 mb-1" id="videoTitle">Select a video to begin</h1>
-              <p class="text-muted mb-2" id="videoCategory"></p> <span class="badge text-bg-secondary"
-                id="videoStatus">Idle</span>
+              <p class="text-muted mb-2" id="videoCategory"></p>
+              <span class="badge text-bg-secondary" id="videoStatus">Idle</span>
             </div>
           </div>
         </section>
+
         <aside class="col-12 col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-header bg-primary text-white"> <strong id="listHeading">All Videos</strong> </div>
