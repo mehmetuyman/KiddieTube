@@ -16,6 +16,8 @@ const YT_PLAYER_VARS = {
   disablekb: 1,
   fs: 0,
   playsinline: 1,
+  enablejsapi: 1,
+  origin: window.location.origin,
 };
 
 const state = {
@@ -27,11 +29,12 @@ const state = {
 
 const selectors = {
   categoryList: document.getElementById('categoryList'),
+  categoryCollapse: document.getElementById('categoryCollapse'),
+  categoryToggle: document.getElementById('categoryToggle'),
   videoList: document.getElementById('videoList'),
   videoTitle: document.getElementById('videoTitle'),
   videoCategory: document.getElementById('videoCategory'),
   listHeading: document.getElementById('listHeading'),
-  videoToggle: document.getElementById('videoToggle'),
   videoStatus: document.getElementById('videoStatus'),
 };
 
@@ -39,18 +42,9 @@ let youtubePlayer = null;
 let playerReady = false;
 let pendingVideoId = null;
 
-selectors.videoToggle.disabled = true;
-selectors.videoToggle.setAttribute('aria-label', 'Loading player...');
-
-selectors.videoToggle.addEventListener('click', () => {
-  if (!playerReady || !youtubePlayer || !state.activeVideoId) return;
-  const status = youtubePlayer.getPlayerState();
-  if (status === YT_STATES.PLAYING || status === YT_STATES.BUFFERING) {
-    youtubePlayer.pauseVideo();
-  } else {
-    youtubePlayer.playVideo();
-  }
-});
+setupResponsiveCategories();
+loadVideos();
+registerServiceWorker();
 
 (function injectYouTubeAPI() {
   if (document.getElementById('youtube-iframe-api')) return;
@@ -139,11 +133,8 @@ function filterAndRender() {
     state.activeVideoId = null;
     selectors.videoTitle.textContent = 'No videos found in this category.';
     selectors.videoCategory.textContent = '';
-    selectors.videoStatus.textContent = 'Idle';
-    selectors.videoToggle.disabled = true;
-    if (playerReady && youtubePlayer) {
-      youtubePlayer.stopVideo();
-    }
+    state.playerStatus = YT_STATES.UNSTARTED;
+    updateVideoStatus();
     return;
   }
 
@@ -192,16 +183,14 @@ function setActiveVideo(video) {
 
   if (playerReady && youtubePlayer) {
     if (!isSameVideo) {
-      state.playerStatus = YT_STATES.BUFFERING;
-      updateVideoStatus();
-      youtubePlayer.loadVideoById(video.id);
+      youtubePlayer.cueVideoById(video.id);
+      state.playerStatus = YT_STATES.CUED;
     }
-    youtubePlayer.playVideo();
   } else {
     pendingVideoId = video.id;
   }
 
-  selectors.videoToggle.disabled = !playerReady;
+  updateVideoStatus();
 }
 
 function highlightActiveVideo() {
@@ -212,13 +201,12 @@ function highlightActiveVideo() {
 
 function handlePlayerReady() {
   playerReady = true;
-  selectors.videoToggle.disabled = !state.activeVideoId;
   const initialId = state.activeVideoId || pendingVideoId;
 
   if (initialId) {
-    state.playerStatus = YT_STATES.BUFFERING;
+    youtubePlayer.cueVideoById(initialId);
+    state.playerStatus = YT_STATES.CUED;
     updateVideoStatus();
-    youtubePlayer.loadVideoById(initialId);
     pendingVideoId = null;
   } else {
     updateVideoStatus();
@@ -226,6 +214,33 @@ function handlePlayerReady() {
 }
 
 function handlePlayerStateChange(event) {
+
+  const pauseOverlay = document.querySelector('.custom-pause-overlay');
+
+  if (event.data === YT_STATES.PAUSED) {
+    if (pauseOverlay) pauseOverlay.style.display = 'flex';
+  } else {
+    if (pauseOverlay) pauseOverlay.style.display = 'none';
+  }
+
+  const bottomLeftGuard = document.querySelector('.iframe-guard-bottom-left');
+
+  if (event.data === YT_STATES.PLAYING) {
+    // Once the video starts, hide bottom-left guard
+    if (bottomLeftGuard) bottomLeftGuard.style.display = 'none';
+  } else if (event.data === YT_STATES.UNSTARTED || event.data === YT_STATES.CUED) {
+    // Before the video starts (unstarted or just cued)
+    if (bottomLeftGuard) bottomLeftGuard.style.display = 'block';
+  }
+
+
+  if (event.data === YT_STATES.ENDED && state.activeVideoId) {
+    youtubePlayer.cueVideoById(state.activeVideoId);
+    state.playerStatus = YT_STATES.CUED;
+    updateVideoStatus();
+    return;
+  }
+
   state.playerStatus = event.data;
   updateVideoStatus();
 }
@@ -233,37 +248,63 @@ function handlePlayerStateChange(event) {
 function updateVideoStatus() {
   if (!state.activeVideoId) {
     selectors.videoStatus.textContent = 'Idle';
-    selectors.videoToggle.setAttribute('aria-label', 'Play video');
     return;
   }
-
-  selectors.videoToggle.disabled = !playerReady;
 
   switch (state.playerStatus) {
     case YT_STATES.PLAYING:
       selectors.videoStatus.textContent = 'Playing';
-      selectors.videoToggle.setAttribute('aria-label', 'Pause video');
       break;
     case YT_STATES.PAUSED:
       selectors.videoStatus.textContent = 'Paused';
-      selectors.videoToggle.setAttribute('aria-label', 'Play video');
       break;
     case YT_STATES.BUFFERING:
       selectors.videoStatus.textContent = 'Loading...';
-      selectors.videoToggle.setAttribute('aria-label', 'Pause video');
       break;
     case YT_STATES.ENDED:
       selectors.videoStatus.textContent = 'Finished';
-      selectors.videoToggle.setAttribute('aria-label', 'Replay video');
       break;
     case YT_STATES.CUED:
       selectors.videoStatus.textContent = 'Ready';
-      selectors.videoToggle.setAttribute('aria-label', 'Play video');
       break;
     default:
       selectors.videoStatus.textContent = 'Ready';
-      selectors.videoToggle.setAttribute('aria-label', 'Play video');
   }
+}
+
+function setupResponsiveCategories() {
+  if (!selectors.categoryCollapse || !window.bootstrap?.Collapse) return;
+
+  const collapseInstance = new window.bootstrap.Collapse(selectors.categoryCollapse, {
+    toggle: false,
+  });
+
+  const mediaQuery = window.matchMedia('(max-width: 991.98px)');
+
+  const syncCollapse = event => {
+    if (event.matches) {
+      collapseInstance.hide();
+    } else {
+      collapseInstance.show();
+    }
+  };
+
+  mediaQuery.addEventListener('change', syncCollapse);
+  syncCollapse(mediaQuery);
+
+  selectors.categoryCollapse.addEventListener('shown.bs.collapse', () => {
+    selectors.categoryToggle?.setAttribute('aria-expanded', 'true');
+    if (selectors.categoryToggle) {
+      selectors.categoryToggle.textContent = 'Hide';
+    }
+  });
+
+  selectors.categoryCollapse.addEventListener('hidden.bs.collapse', () => {
+    selectors.categoryToggle?.setAttribute('aria-expanded', 'false');
+    if (selectors.categoryToggle) {
+      selectors.categoryToggle.textContent = 'Show';
+    }
+  });
 }
 
 function registerServiceWorker() {
@@ -275,6 +316,3 @@ function registerServiceWorker() {
     });
   }
 }
-
-loadVideos();
-registerServiceWorker();

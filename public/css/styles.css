@@ -12,6 +12,12 @@ main {
   min-height: 48px;
 }
 
+.brand-title {
+  font-family: 'Baloo 2', 'Comic Neue', 'Fredoka', 'Poppins', 'Comic Sans MS', cursive;
+  font-size: clamp(1.75rem, 2.2vw + 1rem, 2.75rem);
+  font-weight: 700;
+}
+
 .app-logo {
   width: 48px;
   height: 48px;
@@ -46,13 +52,16 @@ main {
   color: #4a90e2;
 }
 
+.category-card .card-header button {
+  font-family: inherit;
+}
+
 .video-frame {
-  --guard-top: 52px;
-  --controls-safe-zone: 64px;
   position: relative;
   background-color: #000;
 }
 
+.video-frame #videoPlayer,
 .video-frame iframe {
   position: absolute;
   inset: 0;
@@ -61,39 +70,99 @@ main {
   border: 0;
 }
 
+/* === Guards === */
+
+/* Top guard (title/channel bar) */
 .iframe-guard-top {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: var(--guard-top);
+  height: 60px;
+  background: rgba(255, 0, 0, 0.4); red debug
   pointer-events: auto;
-  cursor: not-allowed;
-  z-index: 3;
-  background: transparent;
+  z-index: 10;
 }
 
-.iframe-play-toggle {
+/* Bottom right guard (YouTube branding/logo) */
+.iframe-guard-bottom-right {
   position: absolute;
-  top: var(--guard-top);
-  left: 0;
+  bottom: 0;
   right: 0;
-  bottom: var(--controls-safe-zone);
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  z-index: 2;
+  left: auto; 
+  top: auto;
+  width: 80px;
+  height: 38px;
+  background: rgba(0, 0, 255, 0.5);
+  border: 2px solid #000;   /* debug border */
+  pointer-events: auto;
+  z-index: 9999;            /* force above iframe */
 }
 
-.iframe-play-toggle:disabled {
-  cursor: not-allowed;
+/* Bottom left guard */
+.iframe-guard-bottom-left {
+  position: absolute;
+  bottom: 0;
+  top: auto;
+  left: 0;
+  width: 180px;
+  height: 55px;
+  background: rgba(0, 255, 0, 0.5);
+  border: 2px solid #000;   debug border
+  pointer-events: auto;
+  z-index: 9999;
+  display: block;
 }
 
-.iframe-play-toggle:focus-visible {
-  outline: 2px solid #4a90e2;
-  outline-offset: 2px;
+/* Bottom left guard */
+.iframe-guard-bottom-left2 {
+  /* position: absolute; */
+  bottom: 0;
+  top: auto;
+  left: 0;
+  width: 180px;
+  height: 55px;
+  /* background: rgba(255, 0, 144, 0.5); */
+  border: 2px solid #000;   /* debug border */
+  pointer-events: auto;
+  z-index: 9999;
 }
+
+/* .custom-pause-overlay {
+  position: absolute;
+  inset: 0; /* cover the whole player */
+  background: rgba(0,0,0,9.6);
+  color: white;
+  font-size: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;         /* above iframe */
+  pointer-events: none; /* don’t block play button clicks */
+  display: none;        /* hidden by default */
+} */
+
+.custom-pause-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  
+  width: 250px;
+  height: 120px;
+  
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  z-index: 9999;
+  pointer-events: auto;  /* block clicks behind it */
+  /* display: none;         hidden by default */
+}
+
 
 #videoStatus {
   font-size: 0.85rem;
@@ -126,10 +195,28 @@ main {
 }
 
 @media (max-width: 991px) {
-  .video-frame {
-    --controls-safe-zone: 78px;
+  .iframe-guard-bottom-right {
+    right: 0;
+    bottom: 0;
+    width: clamp(100px, 22vw, 160px);
+    height: 90px;
+  }
+
+  .iframe-guard-bottom-left {
+    left: 0;
+    bottom: 0;
+    width: clamp(100px, 22vw, 160px);
+    height: 90px;
+  }
+
+  .iframe-guard-bottom-left2 {
+    left: 0;
+    bottom: 0;
+    width: clamp(100px, 22vw, 160px);
+    height: 90px;
   }
 }
+
 
 @media (max-width: 767px) {
   #videoList,
