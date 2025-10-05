@@ -77,10 +77,20 @@ export default function YouTubeWrapper({ videoId }: Props) {
     if (btnMute) btnMute.onclick = () => playerRef.current?.mute()
     if (btnUnmute) btnUnmute.onclick = () => playerRef.current?.unMute()
     if (btnFullscreen) btnFullscreen.onclick = () => {
+      // Request fullscreen on the outer container so overlays (pause-shield / guards / controls)
+      // remain active and can intercept touches/clicks while in fullscreen.
+      const container = document.querySelector('.video-container') as HTMLElement | null
       const iframe = playerRef.current.getIframe()
-      if (iframe.requestFullscreen) iframe.requestFullscreen()
-      else if (iframe.webkitRequestFullscreen) iframe.webkitRequestFullscreen()
-      else if (iframe.msRequestFullscreen) iframe.msRequestFullscreen()
+      // ensure iframe allows fullscreen
+      if (iframe && !iframe.hasAttribute('allowfullscreen')) {
+        iframe.setAttribute('allowfullscreen', '');
+        iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+      }
+
+      const target = container || iframe
+      if (target.requestFullscreen) target.requestFullscreen()
+      else if ((target as any).webkitRequestFullscreen) (target as any).webkitRequestFullscreen()
+      else if ((target as any).msRequestFullscreen) (target as any).msRequestFullscreen()
     }
 
     setInterval(() => {

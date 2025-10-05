@@ -139,6 +139,26 @@ main {
 	pointer-events: auto;
 }
 
+/* When the container or document is fullscreen, convert guards to fixed so they remain above the iframe */
+.video-container:-webkit-full-screen .iframe-guard-full,
+.video-container:fullscreen .iframe-guard-full,
+:fullscreen .iframe-guard-full {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 2147483647; /* very high to ensure overlay sits above iframe */
+}
+
+.video-container:-webkit-full-screen .pause-shield,
+.video-container:fullscreen .pause-shield,
+:fullscreen .pause-shield {
+	position: fixed;
+	inset: 0;
+	z-index: 2147483646;
+}
+
 .custom-controls {
 	display: flex;
 	align-items: center;

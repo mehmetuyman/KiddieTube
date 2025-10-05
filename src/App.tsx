@@ -88,13 +88,14 @@ export default function App() {
             <section className="col-12 col-lg-6">
               <div className="card shadow-sm mb-4 mb-lg-0">
                 <div className="card-body">
-                  <div className="ratio ratio-16x9 bg-black rounded overflow-hidden position-relative video-frame mb-3">
-                    <div id="videoPlayer" className="w-100 h-100"></div>
-                    <div className="pause-shield" />
-                    <div className="iframe-guard-full" />
-                  </div>
+                  <div className="video-container">
+                    <div className="ratio ratio-16x9 bg-black rounded overflow-hidden position-relative video-frame mb-3">
+                      <div id="videoPlayer" className="w-100 h-100"></div>
+                      <div className="pause-shield" />
+                      <div className="iframe-guard-full" />
+                    </div>
 
-                  <div className="custom-controls">
+                    <div className="custom-controls">
                     {/* These buttons will be wired by YouTubeWrapper through callbacks */}
                     <button id="btnPlay">▶</button>
                     <button id="btnPause">⏸</button>
@@ -110,6 +111,7 @@ export default function App() {
                   <h1 className="h4 mb-1" id="videoTitle">Select a video to begin</h1>
                   <p className="text-muted mb-2" id="videoCategory"></p>
                   <span className="badge text-bg-secondary" id="videoStatus">Idle</span>
+                </div>
                 </div>
               </div>
             </section>
