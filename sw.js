@@ -1,8 +1,1 @@
-self.addEventListener('install', () => {
-  console.log('[sw] installed');
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(clients.claim());
-  console.log('[sw] activated');
-});
+if(!self.define){let e,i={};const s=(s,n)=>(s=new URL(s+".js",n).href,i[s]||new Promise(i=>{if("document"in self){const e=document.createElement("script");e.src=s,e.onload=i,document.head.appendChild(e)}else e=s,importScripts(s),i()}).then(()=>{let e=i[s];if(!e)throw new Error(`Module ${s} didn’t register its module`);return e}));self.define=(n,c)=>{const r=e||("document"in self?document.currentScript.src:"")||location.href;if(i[r])return;let o={};const t=e=>s(e,r),l={module:{uri:r},exports:o,require:t};i[r]=Promise.all(n.map(e=>l[e]||t(e))).then(e=>(c(...e),o))}}define(["./workbox-5ffe50d4"],function(e){"use strict";self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"assets/index-C0wDg1Wp.css",revision:null},{url:"assets/index-GFWF4BeG.js",revision:null},{url:"index.html",revision:"6739c97ef59541044a05e9f7c853f9c9"},{url:"registerSW.js",revision:"1872c500de691dce40960bb85481de07"},{url:"styles.css",revision:"fbaca310c564743869708f399e9b965c"},{url:"icons/favicon-32.png",revision:"64d154e7cef7c363e8478e41de66002b"},{url:"icons/icon-192.png",revision:"cd9e6698c4a0a8fc72aab251d7d8ce56"},{url:"icons/icon-512.png",revision:"4c2e14503b5dc08bc0524f5ab4733b2c"},{url:"manifest.webmanifest",revision:"6b531595923ed696de6271289cd4eba3"}],{}),e.cleanupOutdatedCaches(),e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("index.html")))});
