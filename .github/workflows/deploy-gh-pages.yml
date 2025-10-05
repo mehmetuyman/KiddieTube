@@ -3,7 +3,8 @@ name: Build and deploy to GitHub Pages
 on:
   push:
     branches:
-      - react-to-root
+      - master
+  workflow_dispatch:
 
 jobs:
   build:
