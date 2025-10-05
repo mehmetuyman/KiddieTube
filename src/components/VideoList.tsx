@@ -9,6 +9,7 @@ export default function VideoList({ videos, activeVideoId, onSelect }:
       {videos.map(video => (
         <button
           key={video.id}
+          data-video-id={video.id}
           type="button"
           className={`list-group-item list-group-item-action d-flex flex-column align-items-start gap-1 ${
             video.id === activeVideoId ? 'active-video' : ''

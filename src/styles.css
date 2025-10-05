@@ -276,6 +276,18 @@ main {
 	background-color: rgba(74, 144, 226, 0.08);
 }
 
+/* Make focused items visually match the manual selection affordance */
+#videoList .list-group-item:focus,
+#videoList .list-group-item:focus-visible {
+	outline: none;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 0 0 4px rgba(74,144,226,0.06);
+	background-color: rgba(74, 144, 226, 0.12);
+}
+
+#videoList .list-group-item.active-video {
+	box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
 #videoList .video-title {
 	font-weight: 600;
 }

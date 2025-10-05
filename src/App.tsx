@@ -24,6 +24,24 @@ export default function App() {
 
   const filtered = activeCategory === 'All' ? videos : videos.filter((v: Video) => v.category === activeCategory)
 
+  // When activeVideoId changes (including when set by category selection), focus the corresponding
+  // video button so it gets the same visual affordance as a manual click.
+  useEffect(() => {
+    if (!activeVideoId) return
+    const btn = document.querySelector<HTMLButtonElement>(`button[data-video-id="${activeVideoId}"]`)
+    if (btn) {
+      // focus for keyboard users and visual affordance
+      btn.focus()
+      // ensure the selected item is visible inside the scrollable list
+      try {
+        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+      } catch (err) {
+        // fallback: instant scroll
+        btn.scrollIntoView()
+      }
+    }
+  }, [activeVideoId])
+
   return (
     <div>
       <header className="bg-light border-bottom py-2 shadow-sm">
@@ -52,7 +70,11 @@ export default function App() {
                         className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center category-item ${
                           cat === activeCategory ? 'active' : ''
                         }`}
-                        onClick={() => setActiveCategory(cat)}
+                          onClick={() => {
+                            setActiveCategory(cat)
+                            const filteredForCat = cat === 'All' ? videos : videos.filter((v: Video) => v.category === cat)
+                            setActiveVideoId(filteredForCat.length ? filteredForCat[0].id : null)
+                          }}
                       >
                         <span>{cat}</span>
                         <span className="badge rounded-pill">{cat === 'All' ? videos.length : videos.filter(v => v.category === cat).length}</span>
@@ -97,7 +119,7 @@ export default function App() {
                 <div className="card-header bg-primary text-white">
                   <strong id="listHeading">All Videos</strong>
                 </div>
-                <div className="list-group list-group-flush" role="list">
+                <div id="videoList" className="list-group list-group-flush" role="list">
                   <VideoList
                     videos={filtered}
                     activeVideoId={activeVideoId}
