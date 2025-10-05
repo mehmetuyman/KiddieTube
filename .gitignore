@@ -35,3 +35,8 @@ coverage/
 
 # Public assets cache
 public/assets/cache/
+
+# Keep local backups and local env files out of commits
+backup-static/
+.env.local
+.env.*.local
