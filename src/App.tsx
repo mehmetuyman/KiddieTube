@@ -10,7 +10,8 @@ export default function App() {
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/videos.json')
+    const base = import.meta.env.BASE_URL || '/'
+    fetch(`${base}videos.json`)
       .then(r => r.json())
       .then((data: Video[]) => {
         setVideos(data)
@@ -19,16 +20,16 @@ export default function App() {
       .catch(err => console.error('Failed to load videos', err))
   }, [])
 
-  const categories = ['All', ...Array.from(new Set(videos.map(v => v.category)))]
+  const categories = ['All', ...Array.from(new Set(videos.map((v: Video) => v.category)))]
 
-  const filtered = activeCategory === 'All' ? videos : videos.filter(v => v.category === activeCategory)
+  const filtered = activeCategory === 'All' ? videos : videos.filter((v: Video) => v.category === activeCategory)
 
   return (
     <div>
       <header className="bg-light border-bottom py-2 shadow-sm">
         <div className="container-xl d-flex flex-wrap align-items-center justify-content-between gap-3">
-          <div className="d-flex align-items-center gap-2 app-brand">
-            <img src="/assets/logo.png" alt="Kiddie Tube logo" className="app-logo" width={48} height={48} />
+            <div className="d-flex align-items-center gap-2 app-brand">
+            <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Kiddie Tube logo" className="app-logo" width={48} height={48} />
             <span className="brand-title text-primary">Kiddie Tube</span>
           </div>
           <span className="text-muted small">Handpicked videos for happy screen time</span>

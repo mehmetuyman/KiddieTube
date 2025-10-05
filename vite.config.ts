@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // GitHub Pages serves the site from https://<user>.github.io/<repo>/
+  // set base to the repo name so asset URLs resolve correctly
+  base: '/KiddieTube/',
   plugins: [
     react(),
     VitePWA({
