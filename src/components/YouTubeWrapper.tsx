@@ -17,6 +17,8 @@ export default function YouTubeWrapper({ videoId }: Props) {
   const playerRef = useRef<any>(null)
   const playerReadyRef = useRef(false)
   const pendingRef = useRef<string | null>(null)
+  const escHandlerRef = useRef<((e: KeyboardEvent) => void) | null>(null)
+  const fsChangeHandlerRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (!document.getElementById('youtube-iframe-api')) {
@@ -76,21 +78,72 @@ export default function YouTubeWrapper({ videoId }: Props) {
     if (btnPause) btnPause.onclick = () => playerRef.current?.pauseVideo()
     if (btnMute) btnMute.onclick = () => playerRef.current?.mute()
     if (btnUnmute) btnUnmute.onclick = () => playerRef.current?.unMute()
-    if (btnFullscreen) btnFullscreen.onclick = () => {
-      // Request fullscreen on the outer container so overlays (pause-shield / guards / controls)
-      // remain active and can intercept touches/clicks while in fullscreen.
-      const container = document.querySelector('.video-container') as HTMLElement | null
-      const iframe = playerRef.current.getIframe()
-      // ensure iframe allows fullscreen
-      if (iframe && !iframe.hasAttribute('allowfullscreen')) {
-        iframe.setAttribute('allowfullscreen', '');
-        iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+    if (btnFullscreen) {
+      const escHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          // exit pseudo-fullscreen if active
+          document.body.classList.remove('pseudo-fullscreen')
+          const c = document.querySelector('.video-container.pseudo-fullscreen')
+          c?.classList.remove('pseudo-fullscreen')
+        }
+      }
+      const fsChangeHandler = () => {
+        // if native fullscreen ended, ensure pseudo class is removed
+        if (!document.fullscreenElement) {
+          document.body.classList.remove('pseudo-fullscreen')
+          const c = document.querySelector('.video-container.pseudo-fullscreen')
+          c?.classList.remove('pseudo-fullscreen')
+        }
+      }
+      escHandlerRef.current = escHandler
+      fsChangeHandlerRef.current = fsChangeHandler
+      document.addEventListener('keydown', escHandler)
+      document.addEventListener('fullscreenchange', fsChangeHandler)
+
+  btnFullscreen.onclick = () => {
+        const container = document.querySelector('.video-container') as HTMLElement | null
+        const iframe = playerRef.current.getIframe()
+        // ensure iframe allows fullscreen and autoplay where needed
+        if (iframe && !iframe.hasAttribute('allowfullscreen')) {
+          iframe.setAttribute('allowfullscreen', '')
+          iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture')
+        }
+
+        // Try native fullscreen on the container first
+        const target = container || iframe
+        const requestFs = (el: any) => {
+          if (!el) return false
+          if (el.requestFullscreen) { el.requestFullscreen(); return true }
+          if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); return true }
+          if (el.msRequestFullscreen) { el.msRequestFullscreen(); return true }
+          return false
+        }
+
+        const started = requestFs(target)
+        if (!started) {
+          // fallback: pseudo-fullscreen (cover viewport with fixed positioned container)
+          if (container) {
+            const isActive = container.classList.contains('pseudo-fullscreen')
+            if (isActive) {
+              document.body.classList.remove('pseudo-fullscreen')
+              container.classList.remove('pseudo-fullscreen')
+            } else {
+              document.body.classList.add('pseudo-fullscreen')
+              container.classList.add('pseudo-fullscreen')
+            }
+          }
       }
 
-      const target = container || iframe
-      if (target.requestFullscreen) target.requestFullscreen()
-      else if ((target as any).webkitRequestFullscreen) (target as any).webkitRequestFullscreen()
-      else if ((target as any).msRequestFullscreen) (target as any).msRequestFullscreen()
+      // exit pseudo-fullscreen button (touch friendly)
+      const btnExit = document.getElementById('btnExitPseudoFs')
+      if (btnExit) {
+        btnExit.onclick = () => {
+          document.body.classList.remove('pseudo-fullscreen')
+          const c = document.querySelector('.video-container.pseudo-fullscreen')
+          c?.classList.remove('pseudo-fullscreen')
+        }
+      }
+      }
     }
 
     setInterval(() => {
@@ -130,6 +183,14 @@ export default function YouTubeWrapper({ videoId }: Props) {
     if (event.data === 2) pauseShield?.classList.add('visible')
     else pauseShield?.classList.remove('visible')
   }
+
+  // cleanup handlers when component unmounts
+  useEffect(() => {
+    return () => {
+      if (escHandlerRef.current) document.removeEventListener('keydown', escHandlerRef.current)
+      if (fsChangeHandlerRef.current) document.removeEventListener('fullscreenchange', fsChangeHandlerRef.current)
+    }
+  }, [])
 
   return null
 }

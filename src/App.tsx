@@ -102,6 +102,9 @@ export default function App() {
                     <button id="btnMute">🔇</button>
                     <button id="btnUnmute">🔊</button>
                     <button id="btnFullscreen">⛶</button>
+                    
+                    {/* Exit pseudo-fullscreen button (visible only in pseudo-fullscreen mode on touch devices) */}
+                    <button id="btnExitPseudoFs" className="exit-fullscreen-btn" aria-label="Exit fullscreen">✕</button>
 
                     <span id="currentTime">0:00</span>
                     <input type="range" id="progressBar" defaultValue={0} min={0} max={100} />

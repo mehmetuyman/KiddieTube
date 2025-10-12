@@ -73,6 +73,53 @@ main {
 	border: 0;
 }
 
+/* Pseudo-fullscreen fallback for platforms (like iOS Safari) that don't support
+   the Fullscreen API reliably for iframes. We make the container fixed and full-viewport. */
+.video-container.pseudo-fullscreen,
+body.pseudo-fullscreen .video-container {
+	position: fixed !important;
+	top: 0 !important;
+	left: 0 !important;
+	right: 0 !important;
+	bottom: 0 !important;
+	width: 100vw !important;
+	height: 100vh !important;
+	z-index: 2147483647 !important;
+	background: #000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.video-container.pseudo-fullscreen .video-frame,
+.video-container.pseudo-fullscreen .video-frame iframe {
+	width: 100% !important;
+	height: 100% !important;
+}
+
+/* Exit fullscreen button visible only in pseudo-fullscreen */
+.exit-fullscreen-btn {
+	display: none;
+}
+.video-container.pseudo-fullscreen .exit-fullscreen-btn,
+body.pseudo-fullscreen .video-container .exit-fullscreen-btn {
+	display: block;
+	position: fixed;
+	top: 12px;
+	right: 12px;
+	z-index: 2147483650;
+	background: rgba(0,0,0,0.6);
+	color: #fff;
+	border: none;
+	width: 44px;
+	height: 44px;
+	border-radius: 22px;
+	font-size: 18px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
 /* === Guards === */
 
 /* Top guard (title/channel bar) */
