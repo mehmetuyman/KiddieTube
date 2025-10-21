@@ -86,15 +86,44 @@ body.pseudo-fullscreen .video-container {
 	height: 100vh !important;
 	z-index: 2147483647 !important;
 	background: #000;
-	display: flex;
-	align-items: center;
-	justify-content: center;
+	padding: 0 !important;
+	margin: 0 !important;
+}
+
+/* Reset any margins in fullscreen */
+.video-container.pseudo-fullscreen .video-frame {
+	margin: 0 !important;
+	padding: 0 !important;
+	width: 100vw !important;
+	height: 100vh !important;
 }
 
 .video-container.pseudo-fullscreen .video-frame,
 .video-container.pseudo-fullscreen .video-frame iframe {
 	width: 100% !important;
 	height: 100% !important;
+}
+
+/* Native fullscreen adjustments */
+.video-container:fullscreen {
+	padding: 0 !important;
+	margin: 0 !important;
+	width: 100vw !important;
+	height: 100vh !important;
+	background: #000;
+}
+
+.video-container:fullscreen .video-frame {
+	margin: 0 !important;
+	width: 100vw !important;
+	height: 100vh !important;
+}
+
+/* Reset fullscreen margins */
+.video-container:fullscreen .fullscreen-reset,
+.video-container.pseudo-fullscreen .fullscreen-reset {
+	margin: 0 !important;
+	padding: 0 !important;
 }
 
 /* Exit fullscreen button visible only in pseudo-fullscreen */
@@ -215,7 +244,53 @@ body.pseudo-fullscreen .video-container .exit-fullscreen-btn {
 	flex-wrap: wrap; /* better on small screens */
 }
 
-.custom-controls button {
+/* Overlay controls only in fullscreen modes */
+.video-container:fullscreen .custom-controls,
+.video-container.pseudo-fullscreen .custom-controls {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  bottom: 18px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  z-index: 2147483651; /* above guards/iframe */
+  transition: opacity 250ms ease, transform 250ms ease;
+  opacity: 0;
+  pointer-events: none; /* when hidden, clicks pass through */
+  background: rgba(0, 0, 0, 0.7); /* semi-transparent background */
+  padding: 12px 16px;
+  border-radius: 8px;
+  min-width: 320px;
+  max-width: 90%;
+}
+
+/* Time displays in fullscreen */
+.video-container:fullscreen .custom-controls #currentTime,
+.video-container:fullscreen .custom-controls #duration,
+.video-container.pseudo-fullscreen .custom-controls #currentTime,
+.video-container.pseudo-fullscreen .custom-controls #duration {
+  color: white;
+  font-size: 14px;
+  font-family: monospace;
+  min-width: 45px; /* prevent jumping */
+  text-align: center;
+}
+
+/* Visible state in fullscreen */
+.video-container:fullscreen .custom-controls.visible,
+.video-container.pseudo-fullscreen .custom-controls.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+/* Adjust bottom position in pseudo-fullscreen */
+.video-container.pseudo-fullscreen .custom-controls {
+  bottom: 28px;
+}.custom-controls button {
 	background: #222;
 	color: #fff;
 	border: none;
@@ -263,6 +338,13 @@ body.pseudo-fullscreen .video-container .exit-fullscreen-btn {
 	background: #555; /* fallback */
 	outline: none;
 	cursor: pointer;
+}
+
+/* Adjust progress bar size in fullscreen */
+.video-container:fullscreen #progressBar,
+.video-container.pseudo-fullscreen #progressBar {
+  max-width: 400px;
+  height: 8px;
 }
 
 /* Chrome/Edge/Safari thumb */

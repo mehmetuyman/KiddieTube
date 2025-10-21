@@ -19,6 +19,14 @@ export default function YouTubeWrapper({ videoId }: Props) {
   const pendingRef = useRef<string | null>(null)
   const escHandlerRef = useRef<((e: KeyboardEvent) => void) | null>(null)
   const fsChangeHandlerRef = useRef<(() => void) | null>(null)
+  const hideTimerRef = useRef<number | null>(null)
+  const controlsVisibleRef = useRef(false)
+  const progressIntervalRef = useRef<number | null>(null)
+  const frameClickHandlerRef = useRef<((e: Event) => void) | null>(null)
+  const frameTouchHandlerRef = useRef<(() => void) | null>(null)
+  const containerMouseMoveHandlerRef = useRef<(() => void) | null>(null)
+  const controlsPointerDownHandlerRef = useRef<(() => void) | null>(null)
+  const controlsPointerUpHandlerRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (!document.getElementById('youtube-iframe-api')) {
@@ -73,6 +81,9 @@ export default function YouTubeWrapper({ videoId }: Props) {
     const progressBar = document.getElementById('progressBar') as HTMLInputElement | null
     const currentTimeEl = document.getElementById('currentTime')
     const durationEl = document.getElementById('duration')
+  const controlsEl = document.querySelector('.custom-controls') as HTMLElement | null
+  const container = document.querySelector('.video-container') as HTMLElement | null
+  const frame = document.querySelector('.video-frame') as HTMLElement | null
 
     if (btnPlay) btnPlay.onclick = () => playerRef.current?.playVideo()
     if (btnPause) btnPause.onclick = () => playerRef.current?.pauseVideo()
@@ -93,6 +104,8 @@ export default function YouTubeWrapper({ videoId }: Props) {
           document.body.classList.remove('pseudo-fullscreen')
           const c = document.querySelector('.video-container.pseudo-fullscreen')
           c?.classList.remove('pseudo-fullscreen')
+          // Hide overlay controls when exiting fullscreen
+          hideControls()
         }
       }
       escHandlerRef.current = escHandler
@@ -107,6 +120,15 @@ export default function YouTubeWrapper({ videoId }: Props) {
         if (iframe && !iframe.hasAttribute('allowfullscreen')) {
           iframe.setAttribute('allowfullscreen', '')
           iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture')
+        }
+
+        // Check if we're already in fullscreen
+        if (document.fullscreenElement) {
+          // Exit fullscreen
+          if (document.exitFullscreen) document.exitFullscreen()
+          else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen()
+          else if ((document as any).msExitFullscreen) (document as any).msExitFullscreen()
+          return
         }
 
         // Try native fullscreen on the container first
@@ -146,7 +168,87 @@ export default function YouTubeWrapper({ videoId }: Props) {
       }
     }
 
-    setInterval(() => {
+    // --- show/hide overlay controls (tap to show, auto-hide) ---
+    function clearHideTimer() {
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current)
+        hideTimerRef.current = null
+      }
+    }
+
+    function hideControls() {
+      if (!controlsEl) return
+      controlsEl.classList.remove('visible')
+      controlsVisibleRef.current = false
+    }
+
+    function isFullscreen() {
+      return document.fullscreenElement !== null || container?.classList.contains('pseudo-fullscreen') || false
+    }
+
+    function showControls() {
+      if (!controlsEl || !container) return
+      if (!isFullscreen()) return // only show overlay in fullscreen
+      controlsEl.classList.add('visible')
+      controlsVisibleRef.current = true
+      clearHideTimer()
+      // auto-hide after 3s
+      hideTimerRef.current = window.setTimeout(() => {
+        if (isFullscreen()) hideControls()
+      }, 3000)
+    }
+
+    // tap/click on video frame should toggle controls only in fullscreen
+    if (frame) {
+      const onClick = (e: Event) => {
+        if (!isFullscreen()) return
+        if (controlsEl && (e.target === controlsEl || controlsEl.contains(e.target as Node))) return
+        if (controlsVisibleRef.current) hideControls()
+        else showControls()
+      }
+      const onTouch = () => {
+        if (isFullscreen()) showControls()
+      }
+      frame.addEventListener('click', onClick)
+      frame.addEventListener('touchstart', onTouch)
+      frameClickHandlerRef.current = onClick
+      frameTouchHandlerRef.current = onTouch
+    }
+
+    // mouse activity should reveal controls briefly in fullscreen (desktop)
+    if (container) {
+      let mouseMoveTimer: number | null = null
+      const onMouseMove = () => {
+        if (!isFullscreen()) return
+        showControls()
+        if (mouseMoveTimer) window.clearTimeout(mouseMoveTimer)
+        mouseMoveTimer = window.setTimeout(() => {
+          mouseMoveTimer = null
+        }, 200)
+      }
+      container.addEventListener('mousemove', onMouseMove)
+      containerMouseMoveHandlerRef.current = onMouseMove
+
+      // when interacting with controls keep them visible (in fullscreen)
+      if (controlsEl) {
+        const onPointerDown = () => {
+          if (isFullscreen()) clearHideTimer()
+        }
+        const onPointerUp = () => {
+          if (!isFullscreen()) return
+          clearHideTimer()
+          hideTimerRef.current = window.setTimeout(() => hideControls(), 3000)
+        }
+        controlsEl.addEventListener('pointerdown', onPointerDown)
+        controlsEl.addEventListener('pointerup', onPointerUp)
+        controlsPointerDownHandlerRef.current = onPointerDown
+        controlsPointerUpHandlerRef.current = onPointerUp
+      }
+
+      // cleanup attachments when leaving attachControls scope is handled by top-level cleanup
+    }
+
+    progressIntervalRef.current = window.setInterval(() => {
       if (playerRef.current && playerRef.current.getDuration) {
         const duration = playerRef.current.getDuration()
         const current = playerRef.current.getCurrentTime()
@@ -163,13 +265,15 @@ export default function YouTubeWrapper({ videoId }: Props) {
           if (durationEl) durationEl.textContent = formatTime(duration)
         }
       }
-    }, 1000)
+  }, 1000)
 
     if (progressBar) {
       progressBar.addEventListener('input', () => {
         playerRef.current?.seekTo(Number(progressBar.value), true)
       })
     }
+
+    // end attachControls
 
     function formatTime(sec: number) {
       const minutes = Math.floor(sec / 60)
@@ -189,6 +293,32 @@ export default function YouTubeWrapper({ videoId }: Props) {
     return () => {
       if (escHandlerRef.current) document.removeEventListener('keydown', escHandlerRef.current)
       if (fsChangeHandlerRef.current) document.removeEventListener('fullscreenchange', fsChangeHandlerRef.current)
+      // remove any listeners we added to DOM nodes
+      const frame = document.querySelector('.video-frame') as HTMLElement | null
+      const container = document.querySelector('.video-container') as HTMLElement | null
+      const controlsEl = document.querySelector('.custom-controls') as HTMLElement | null
+      if (frame) {
+        if (frameClickHandlerRef.current) frame.removeEventListener('click', frameClickHandlerRef.current)
+        if (frameTouchHandlerRef.current) frame.removeEventListener('touchstart', frameTouchHandlerRef.current)
+      }
+      if (container) {
+        if (containerMouseMoveHandlerRef.current) container.removeEventListener('mousemove', containerMouseMoveHandlerRef.current)
+        // remove overlay class
+        container.classList.remove('controls-overlay')
+      }
+      if (controlsEl) {
+        if (controlsPointerDownHandlerRef.current) controlsEl.removeEventListener('pointerdown', controlsPointerDownHandlerRef.current)
+        if (controlsPointerUpHandlerRef.current) controlsEl.removeEventListener('pointerup', controlsPointerUpHandlerRef.current)
+        controlsEl.classList.remove('visible')
+      }
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current)
+        hideTimerRef.current = null
+      }
+      if (progressIntervalRef.current) {
+        window.clearInterval(progressIntervalRef.current)
+        progressIntervalRef.current = null
+      }
     }
   }, [])
 

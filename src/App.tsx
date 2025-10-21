@@ -89,7 +89,7 @@ export default function App() {
               <div className="card shadow-sm mb-4 mb-lg-0">
                 <div className="card-body">
                   <div className="video-container">
-                    <div className="ratio ratio-16x9 bg-black rounded overflow-hidden position-relative video-frame mb-3">
+                    <div className="ratio ratio-16x9 bg-black rounded overflow-hidden position-relative video-frame mb-3 fullscreen-reset">
                       <div id="videoPlayer" className="w-100 h-100"></div>
                       <div className="pause-shield" />
                       <div className="iframe-guard-full" />
