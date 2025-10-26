@@ -11,9 +11,13 @@ const YT_PLAYER_VARS = {
   origin: window.location.origin,
 }
 
-type Props = { videoId: string | null }
+type Video = { id: string; title: string; category: string }
+type Props = { 
+  videoId: string | null
+  videos: Video[]
+}
 
-export default function YouTubeWrapper({ videoId }: Props) {
+export default function YouTubeWrapper({ videoId, videos }: Props) {
   const playerRef = useRef<any>(null)
   const playerReadyRef = useRef(false)
   const pendingRef = useRef<string | null>(null)
@@ -27,6 +31,7 @@ export default function YouTubeWrapper({ videoId }: Props) {
   const containerMouseMoveHandlerRef = useRef<(() => void) | null>(null)
   const controlsPointerDownHandlerRef = useRef<(() => void) | null>(null)
   const controlsPointerUpHandlerRef = useRef<(() => void) | null>(null)
+  const isMutedRef = useRef<boolean>(false)
 
   useEffect(() => {
     if (!document.getElementById('youtube-iframe-api')) {
@@ -67,10 +72,72 @@ export default function YouTubeWrapper({ videoId }: Props) {
     if (!videoId) return
     if (playerReadyRef.current && playerRef.current) {
       playerRef.current.cueVideoById(videoId)
+      updateVideoInfo(videoId)
     } else {
       pendingRef.current = videoId
     }
-  }, [videoId])
+  }, [videoId, videos])
+
+  function updateVideoInfo(id: string) {
+    const video = videos.find(v => v.id === id)
+    const titleEl = document.getElementById('videoTitle')
+    const categoryEl = document.getElementById('videoCategory')
+    
+    if (titleEl) {
+      titleEl.textContent = video ? video.title : 'Select a video to begin'
+    }
+    if (categoryEl) {
+      categoryEl.textContent = video ? video.category : ''
+    }
+  }
+
+  function updateButtonStates() {
+    if (!playerRef.current) return
+    
+    const btnPlay = document.getElementById('btnPlay')
+    const btnPause = document.getElementById('btnPause')
+    const btnMute = document.getElementById('btnMute')
+    const btnUnmute = document.getElementById('btnUnmute')
+    const btnFullscreen = document.getElementById('btnFullscreen')
+    
+    // Update play/pause states
+    const playerState = playerRef.current.getPlayerState?.()
+    if (btnPlay && btnPause) {
+      if (playerState === 1) { // Playing
+        btnPlay.classList.add('active')
+        btnPause.classList.remove('active')
+      } else if (playerState === 2) { // Paused
+        btnPlay.classList.remove('active')
+        btnPause.classList.add('active')
+      } else {
+        btnPlay.classList.remove('active')
+        btnPause.classList.remove('active')
+      }
+    }
+    
+    // Update mute/unmute states - use our tracked state
+    if (btnMute && btnUnmute) {
+      if (isMutedRef.current) {
+        btnMute.classList.add('active')
+        btnUnmute.classList.remove('active')
+      } else {
+        btnMute.classList.remove('active')
+        btnUnmute.classList.add('active')
+      }
+    }
+    
+    // Update fullscreen state
+    if (btnFullscreen) {
+      const isFs = document.fullscreenElement || 
+                   document.querySelector('.video-container.pseudo-fullscreen') ||
+                   document.body.classList.contains('pseudo-fullscreen')
+      if (isFs) {
+        btnFullscreen.classList.add('active')
+      } else {
+        btnFullscreen.classList.remove('active')
+      }
+    }
+  }
 
   function attachControls() {
     const btnPlay = document.getElementById('btnPlay')
@@ -85,10 +152,24 @@ export default function YouTubeWrapper({ videoId }: Props) {
   const container = document.querySelector('.video-container') as HTMLElement | null
   const frame = document.querySelector('.video-frame') as HTMLElement | null
 
-    if (btnPlay) btnPlay.onclick = () => playerRef.current?.playVideo()
-    if (btnPause) btnPause.onclick = () => playerRef.current?.pauseVideo()
-    if (btnMute) btnMute.onclick = () => playerRef.current?.mute()
-    if (btnUnmute) btnUnmute.onclick = () => playerRef.current?.unMute()
+    if (btnPlay) btnPlay.onclick = () => {
+      playerRef.current?.playVideo()
+      updateButtonStates()
+    }
+    if (btnPause) btnPause.onclick = () => {
+      playerRef.current?.pauseVideo()
+      updateButtonStates()
+    }
+    if (btnMute) btnMute.onclick = () => {
+      playerRef.current?.mute()
+      isMutedRef.current = true
+      updateButtonStates()
+    }
+    if (btnUnmute) btnUnmute.onclick = () => {
+      playerRef.current?.unMute()
+      isMutedRef.current = false
+      updateButtonStates()
+    }
     if (btnFullscreen) {
       const escHandler = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
@@ -96,6 +177,7 @@ export default function YouTubeWrapper({ videoId }: Props) {
           document.body.classList.remove('pseudo-fullscreen')
           const c = document.querySelector('.video-container.pseudo-fullscreen')
           c?.classList.remove('pseudo-fullscreen')
+          updateButtonStates()
         }
       }
       const fsChangeHandler = () => {
@@ -107,6 +189,7 @@ export default function YouTubeWrapper({ videoId }: Props) {
           // Hide overlay controls when exiting fullscreen
           hideControls()
         }
+        updateButtonStates()
       }
       escHandlerRef.current = escHandler
       fsChangeHandlerRef.current = fsChangeHandler
@@ -128,6 +211,7 @@ export default function YouTubeWrapper({ videoId }: Props) {
           if (document.exitFullscreen) document.exitFullscreen()
           else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen()
           else if ((document as any).msExitFullscreen) (document as any).msExitFullscreen()
+          setTimeout(() => updateButtonStates(), 100)
           return
         }
 
@@ -153,6 +237,7 @@ export default function YouTubeWrapper({ videoId }: Props) {
               document.body.classList.add('pseudo-fullscreen')
               container.classList.add('pseudo-fullscreen')
             }
+            updateButtonStates()
           }
       }
 
@@ -163,6 +248,7 @@ export default function YouTubeWrapper({ videoId }: Props) {
           document.body.classList.remove('pseudo-fullscreen')
           const c = document.querySelector('.video-container.pseudo-fullscreen')
           c?.classList.remove('pseudo-fullscreen')
+          updateButtonStates()
         }
       }
       }
@@ -273,6 +359,9 @@ export default function YouTubeWrapper({ videoId }: Props) {
       })
     }
 
+    // Initialize button states
+    setTimeout(() => updateButtonStates(), 500)
+
     // end attachControls
 
     function formatTime(sec: number) {
@@ -284,8 +373,39 @@ export default function YouTubeWrapper({ videoId }: Props) {
 
   function handleStateChange(event: any) {
     const pauseShield = document.querySelector('.pause-shield')
-    if (event.data === 2) pauseShield?.classList.add('visible')
-    else pauseShield?.classList.remove('visible')
+    const statusEl = document.getElementById('videoStatus')
+    
+    // YT.PlayerState: -1 = unstarted, 0 = ended, 1 = playing, 2 = paused, 3 = buffering, 5 = cued
+    if (event.data === 2) {
+      pauseShield?.classList.add('visible')
+      if (statusEl) {
+        statusEl.textContent = 'Paused'
+        statusEl.className = 'badge text-bg-warning'
+      }
+    } else {
+      pauseShield?.classList.remove('visible')
+      if (statusEl) {
+        if (event.data === 1) {
+          statusEl.textContent = 'Playing'
+          statusEl.className = 'badge text-bg-success'
+        } else if (event.data === 0) {
+          statusEl.textContent = 'Ended'
+          statusEl.className = 'badge text-bg-secondary'
+        } else if (event.data === 3) {
+          statusEl.textContent = 'Buffering'
+          statusEl.className = 'badge text-bg-info'
+        } else if (event.data === 5) {
+          statusEl.textContent = 'Ready'
+          statusEl.className = 'badge text-bg-primary'
+        } else {
+          statusEl.textContent = 'Idle'
+          statusEl.className = 'badge text-bg-secondary'
+        }
+      }
+    }
+    
+    // Update button states when player state changes
+    updateButtonStates()
   }
 
   // cleanup handlers when component unmounts
