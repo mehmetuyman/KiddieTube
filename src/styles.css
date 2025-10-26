@@ -956,6 +956,17 @@ body.pseudo-fullscreen {
   margin-bottom: 16px;
 }
 
+/* Reduce gap on mobile between player and video list */
+@media (max-width: 991px) {
+  .player-sticky-wrapper {
+    margin-bottom: 8px;
+  }
+  
+  .player-sticky-wrapper .card {
+    margin-bottom: 0 !important;
+  }
+}
+
 /* Video list specific scrolling */
 @media (max-width: 991px) {
   .video-list-card {
