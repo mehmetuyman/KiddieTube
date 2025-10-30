@@ -94,35 +94,18 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
   function updateButtonStates() {
     if (!playerRef.current) return
     
-    const btnPlay = document.getElementById('btnPlay')
-    const btnPause = document.getElementById('btnPause')
-    const btnMute = document.getElementById('btnMute')
-    const btnUnmute = document.getElementById('btnUnmute')
+    const btnPlayPause = document.getElementById('btnPlayPause')
     const btnFullscreen = document.getElementById('btnFullscreen')
     
-    // Update play/pause states
+    // Update play/pause button text and state
     const playerState = playerRef.current.getPlayerState?.()
-    if (btnPlay && btnPause) {
+    if (btnPlayPause) {
       if (playerState === 1) { // Playing
-        btnPlay.classList.add('active')
-        btnPause.classList.remove('active')
-      } else if (playerState === 2) { // Paused
-        btnPlay.classList.remove('active')
-        btnPause.classList.add('active')
-      } else {
-        btnPlay.classList.remove('active')
-        btnPause.classList.remove('active')
-      }
-    }
-    
-    // Update mute/unmute states - use our tracked state
-    if (btnMute && btnUnmute) {
-      if (isMutedRef.current) {
-        btnMute.classList.add('active')
-        btnUnmute.classList.remove('active')
-      } else {
-        btnMute.classList.remove('active')
-        btnUnmute.classList.add('active')
+        btnPlayPause.textContent = '⏸'
+        btnPlayPause.classList.add('active')
+      } else { // Paused or other
+        btnPlayPause.textContent = '▶'
+        btnPlayPause.classList.remove('active')
       }
     }
     
@@ -140,36 +123,32 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
   }
 
   function attachControls() {
-    const btnPlay = document.getElementById('btnPlay')
-    const btnPause = document.getElementById('btnPause')
-    const btnMute = document.getElementById('btnMute')
-    const btnUnmute = document.getElementById('btnUnmute')
+    const btnPlayPause = document.getElementById('btnPlayPause')
     const btnFullscreen = document.getElementById('btnFullscreen')
+    const btnExitPseudoFs = document.getElementById('btnExitPseudoFs')
     const progressBar = document.getElementById('progressBar') as HTMLInputElement | null
     const currentTimeEl = document.getElementById('currentTime')
     const durationEl = document.getElementById('duration')
-  const controlsEl = document.querySelector('.custom-controls') as HTMLElement | null
-  const container = document.querySelector('.video-container') as HTMLElement | null
-  const frame = document.querySelector('.video-frame') as HTMLElement | null
+    const controlsEl = document.querySelector('.custom-controls') as HTMLElement | null
+    const container = document.querySelector('.video-container') as HTMLElement | null
+    const frame = document.querySelector('.video-frame') as HTMLElement | null
 
-    if (btnPlay) btnPlay.onclick = () => {
-      playerRef.current?.playVideo()
-      updateButtonStates()
+    // Single Play/Pause toggle button
+    if (btnPlayPause) {
+      btnPlayPause.onclick = () => {
+        if (!playerRef.current) return
+        const state = playerRef.current.getPlayerState?.()
+        if (state === 1) { // Playing
+          playerRef.current.pauseVideo()
+          btnPlayPause.textContent = '▶'
+        } else { // Paused or other
+          playerRef.current.playVideo()
+          btnPlayPause.textContent = '⏸'
+        }
+      }
     }
-    if (btnPause) btnPause.onclick = () => {
-      playerRef.current?.pauseVideo()
-      updateButtonStates()
-    }
-    if (btnMute) btnMute.onclick = () => {
-      playerRef.current?.mute()
-      isMutedRef.current = true
-      updateButtonStates()
-    }
-    if (btnUnmute) btnUnmute.onclick = () => {
-      playerRef.current?.unMute()
-      isMutedRef.current = false
-      updateButtonStates()
-    }
+    
+    // Fullscreen and exit fullscreen buttons
     if (btnFullscreen) {
       const escHandler = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
@@ -266,6 +245,9 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
       if (!controlsEl) return
       controlsEl.classList.remove('visible')
       controlsVisibleRef.current = false
+      // Also hide minimize button
+      const btnExit = document.getElementById('btnExitPseudoFs')
+      if (btnExit) btnExit.classList.remove('visible')
     }
 
     function isFullscreen() {
@@ -277,6 +259,9 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
       if (!isFullscreen()) return // only show overlay in fullscreen
       controlsEl.classList.add('visible')
       controlsVisibleRef.current = true
+      // Also show minimize button
+      const btnExit = document.getElementById('btnExitPseudoFs')
+      if (btnExit) btnExit.classList.add('visible')
       clearHideTimer()
       // auto-hide after 3s
       hideTimerRef.current = window.setTimeout(() => {
@@ -374,6 +359,7 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
   function handleStateChange(event: any) {
     const pauseShield = document.querySelector('.pause-shield')
     const statusEl = document.getElementById('videoStatus')
+    const btnPlayPause = document.getElementById('btnPlayPause')
     
     // YT.PlayerState: -1 = unstarted, 0 = ended, 1 = playing, 2 = paused, 3 = buffering, 5 = cued
     if (event.data === 2) {
@@ -382,8 +368,10 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
         statusEl.textContent = 'Paused'
         statusEl.className = 'badge text-bg-warning'
       }
+      if (btnPlayPause) btnPlayPause.textContent = '▶'
     } else {
       pauseShield?.classList.remove('visible')
+      if (btnPlayPause && event.data === 1) btnPlayPause.textContent = '⏸'
       if (statusEl) {
         if (event.data === 1) {
           statusEl.textContent = 'Playing'
@@ -391,6 +379,7 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
         } else if (event.data === 0) {
           statusEl.textContent = 'Ended'
           statusEl.className = 'badge text-bg-secondary'
+          if (btnPlayPause) btnPlayPause.textContent = '▶'
         } else if (event.data === 3) {
           statusEl.textContent = 'Buffering'
           statusEl.className = 'badge text-bg-info'
