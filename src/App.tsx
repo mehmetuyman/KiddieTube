@@ -20,8 +20,9 @@ const CATEGORY_EMOJIS: Record<string, string> = {
 
 export default function App() {
   const [videos, setVideos] = useState<Video[]>([])
-  const [activeCategory, setActiveCategory] = useState<string>('All')
+  const [activeCategory, setActiveCategory] = useState('All')
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
+  const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
 
   useEffect(() => {
     const base = import.meta.env.BASE_URL || '/'
@@ -55,6 +56,7 @@ export default function App() {
 
   const handleVideoSelect = (id: string) => {
     setActiveVideoId(id)
+    setShouldAutoPlay(true) // User explicitly clicked a video, auto-play it
     // Scroll to show full player at top
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -93,6 +95,7 @@ export default function App() {
                   setActiveCategory(cat)
                   const filteredForCat = cat === 'All' ? videos : videos.filter((v: Video) => v.category === cat)
                   setActiveVideoId(filteredForCat.length ? filteredForCat[0].id : null)
+                  setShouldAutoPlay(false) // Don't auto-play on category change
                 }}
               >
                 <span className="category-emoji">{emoji}</span>
@@ -116,9 +119,15 @@ export default function App() {
           <button id="btnExitPseudoFs" className="control-btn-topright exit-fullscreen" aria-label="Exit fullscreen">⛶</button>
 
           <div className="custom-controls">
-            {/* Bottom center: Play/Pause, timeline, and fullscreen button */}
+            {/* Bottom center: Play/Pause, skip buttons, timeline, and fullscreen button */}
             <div className="controls-bottom">
+              <button id="btnSkipBack" className="control-btn-skip" title="Back 10s">
+                <span className="skip-icon">↶<sub>10</sub></span>
+              </button>
               <button id="btnPlayPause" className="control-btn-play">▶</button>
+              <button id="btnSkipForward" className="control-btn-skip" title="Forward 10s">
+                <span className="skip-icon">↷<sub>10</sub></span>
+              </button>
               <span id="currentTime" className="time-display">0:00</span>
               <input type="range" id="progressBar" className="progress-slider" defaultValue={0} min={0} max={100} />
               <span id="duration" className="time-display">0:00</span>
@@ -148,7 +157,7 @@ export default function App() {
       </section>
 
       <InstallPrompt onClose={() => {}} />
-      <YouTubeWrapper videoId={activeVideoId} videos={videos} />
+      <YouTubeWrapper videoId={activeVideoId} videos={videos} autoPlay={shouldAutoPlay} />
     </div>
   )
 }

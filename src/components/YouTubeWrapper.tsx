@@ -15,12 +15,14 @@ type Video = { id: string; title: string; category: string }
 type Props = { 
   videoId: string | null
   videos: Video[]
+  autoPlay?: boolean
 }
 
-export default function YouTubeWrapper({ videoId, videos }: Props) {
+export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Props) {
   const playerRef = useRef<any>(null)
   const playerReadyRef = useRef(false)
   const pendingRef = useRef<string | null>(null)
+  const autoPlayRef = useRef<boolean>(autoPlay)
   const escHandlerRef = useRef<((e: KeyboardEvent) => void) | null>(null)
   const fsChangeHandlerRef = useRef<(() => void) | null>(null)
   const hideTimerRef = useRef<number | null>(null)
@@ -51,7 +53,7 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
           onReady: () => {
             playerReadyRef.current = true
             if (pendingRef.current) {
-              // @ts-ignore
+              // @ts-ignore - Only cue on initial load, don't auto-play
               playerRef.current.cueVideoById(pendingRef.current)
               pendingRef.current = null
             }
@@ -69,9 +71,18 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
   }, [])
 
   useEffect(() => {
+    autoPlayRef.current = autoPlay
+  }, [autoPlay])
+
+  useEffect(() => {
     if (!videoId) return
     if (playerReadyRef.current && playerRef.current) {
-      playerRef.current.cueVideoById(videoId)
+      // Load video - only auto-play if explicitly requested
+      if (autoPlayRef.current) {
+        playerRef.current.loadVideoById(videoId)
+      } else {
+        playerRef.current.cueVideoById(videoId)
+      }
       updateVideoInfo(videoId)
     } else {
       pendingRef.current = videoId
@@ -124,6 +135,8 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
 
   function attachControls() {
     const btnPlayPause = document.getElementById('btnPlayPause')
+    const btnSkipBack = document.getElementById('btnSkipBack')
+    const btnSkipForward = document.getElementById('btnSkipForward')
     const btnFullscreen = document.getElementById('btnFullscreen')
     const btnExitPseudoFs = document.getElementById('btnExitPseudoFs')
     const progressBar = document.getElementById('progressBar') as HTMLInputElement | null
@@ -145,6 +158,25 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
           playerRef.current.playVideo()
           btnPlayPause.textContent = '⏸'
         }
+      }
+    }
+
+    // Skip backward 10 seconds
+    if (btnSkipBack) {
+      btnSkipBack.onclick = () => {
+        if (!playerRef.current) return
+        const currentTime = playerRef.current.getCurrentTime?.() || 0
+        playerRef.current.seekTo(Math.max(0, currentTime - 10), true)
+      }
+    }
+
+    // Skip forward 10 seconds
+    if (btnSkipForward) {
+      btnSkipForward.onclick = () => {
+        if (!playerRef.current) return
+        const currentTime = playerRef.current.getCurrentTime?.() || 0
+        const duration = playerRef.current.getDuration?.() || 0
+        playerRef.current.seekTo(Math.min(duration, currentTime + 10), true)
       }
     }
     
@@ -346,6 +378,54 @@ export default function YouTubeWrapper({ videoId, videos }: Props) {
 
     // Initialize button states
     setTimeout(() => updateButtonStates(), 500)
+
+    // Lock to portrait when not playing, allow rotation when playing
+    const updateOrientationLock = () => {
+      const playerState = playerRef.current?.getPlayerState?.()
+      const isPlaying = playerState === 1
+      
+      // Try to lock/unlock screen orientation
+      // @ts-ignore - lock/unlock may not be in all TS definitions
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        if (isPlaying) {
+          // Allow any orientation when playing
+          // @ts-ignore
+          screen.orientation.unlock()
+        } else {
+          // Lock to portrait when not playing
+          // @ts-ignore
+          screen.orientation.lock('portrait').catch(() => {
+            // Orientation lock may fail in some browsers, that's ok
+          })
+        }
+      }
+    }
+
+    // Auto-enter fullscreen on landscape orientation
+    const handleOrientationChange = () => {
+      const container = document.querySelector('.video-container') as HTMLElement | null
+      if (!container) return
+      
+      // Only trigger if video is playing
+      const playerState = playerRef.current?.getPlayerState?.()
+      if (playerState !== 1) return // Not playing
+      
+      const isLandscape = window.matchMedia('(orientation: landscape)').matches
+      const isAlreadyFullscreen = document.fullscreenElement || container.classList.contains('pseudo-fullscreen')
+      
+      if (isLandscape && !isAlreadyFullscreen) {
+        // Enter fullscreen
+        container.classList.add('pseudo-fullscreen')
+        document.body.classList.add('pseudo-fullscreen')
+        updateButtonStates()
+      }
+    }
+    
+    window.addEventListener('orientationchange', handleOrientationChange)
+    window.matchMedia('(orientation: landscape)').addEventListener('change', handleOrientationChange)
+    
+    // Update orientation lock whenever player state might change
+    const orientationCheckInterval = setInterval(updateOrientationLock, 1000)
 
     // end attachControls
 
