@@ -145,7 +145,7 @@ export default function App() {
           <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Kiddie Tube" className="app-logo" />
           <span className="brand-title">Kiddie Tube</span>
         </div>
-        <span className="version-badge">v2.0.0</span>
+        <span className="version-badge">v2.1.0</span>
       </header>
 
       {/* Horizontal scrolling category pills */}

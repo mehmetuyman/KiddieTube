@@ -34,6 +34,10 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
   const controlsPointerDownHandlerRef = useRef<(() => void) | null>(null)
   const controlsPointerUpHandlerRef = useRef<(() => void) | null>(null)
   const isMutedRef = useRef<boolean>(false)
+  const controlsAttachedRef = useRef(false)
+  const orientationHandlerRef = useRef<(() => void) | null>(null)
+  const orientationMediaRef = useRef<MediaQueryList | null>(null)
+  const orientationCheckIntervalRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!document.getElementById('youtube-iframe-api')) {
@@ -134,6 +138,11 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
   }
 
   function attachControls() {
+    // Guard against wiring the same DOM/window listeners twice (e.g. a second
+    // player `onReady`, or a StrictMode double-mount in development).
+    if (controlsAttachedRef.current) return
+    controlsAttachedRef.current = true
+
     const btnPlayPause = document.getElementById('btnPlayPause')
     const btnSkipBack = document.getElementById('btnSkipBack')
     const btnSkipForward = document.getElementById('btnSkipForward')
@@ -207,7 +216,7 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
       document.addEventListener('keydown', escHandler)
       document.addEventListener('fullscreenchange', fsChangeHandler)
 
-  btnFullscreen.onclick = () => {
+      btnFullscreen.onclick = () => {
         const container = document.querySelector('.video-container') as HTMLElement | null
         const iframe = playerRef.current.getIframe()
         // ensure iframe allows fullscreen and autoplay where needed
@@ -250,18 +259,19 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
             }
             updateButtonStates()
           }
-      }
-
-      // exit pseudo-fullscreen button (touch friendly)
-      const btnExit = document.getElementById('btnExitPseudoFs')
-      if (btnExit) {
-        btnExit.onclick = () => {
-          document.body.classList.remove('pseudo-fullscreen')
-          const c = document.querySelector('.video-container.pseudo-fullscreen')
-          c?.classList.remove('pseudo-fullscreen')
-          updateButtonStates()
         }
       }
+    }
+
+    // Exit pseudo-fullscreen button (touch friendly). Wired at attach time -
+    // not inside btnFullscreen.onclick - so it also works when pseudo-fullscreen
+    // was entered automatically on landscape rotation.
+    if (btnExitPseudoFs) {
+      btnExitPseudoFs.onclick = () => {
+        document.body.classList.remove('pseudo-fullscreen')
+        const c = document.querySelector('.video-container.pseudo-fullscreen')
+        c?.classList.remove('pseudo-fullscreen')
+        updateButtonStates()
       }
     }
 
@@ -421,11 +431,17 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
       }
     }
     
+    const orientationMedia = window.matchMedia('(orientation: landscape)')
     window.addEventListener('orientationchange', handleOrientationChange)
-    window.matchMedia('(orientation: landscape)').addEventListener('change', handleOrientationChange)
-    
+    orientationMedia.addEventListener('change', handleOrientationChange)
+
     // Update orientation lock whenever player state might change
-    const orientationCheckInterval = setInterval(updateOrientationLock, 1000)
+    const orientationCheckInterval = window.setInterval(updateOrientationLock, 1000)
+
+    // Track for cleanup on unmount
+    orientationHandlerRef.current = handleOrientationChange
+    orientationMediaRef.current = orientationMedia
+    orientationCheckIntervalRef.current = orientationCheckInterval
 
     // end attachControls
 
@@ -508,6 +524,16 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
         window.clearInterval(progressIntervalRef.current)
         progressIntervalRef.current = null
       }
+      if (orientationHandlerRef.current) {
+        window.removeEventListener('orientationchange', orientationHandlerRef.current)
+        orientationMediaRef.current?.removeEventListener('change', orientationHandlerRef.current)
+        orientationHandlerRef.current = null
+      }
+      if (orientationCheckIntervalRef.current) {
+        window.clearInterval(orientationCheckIntervalRef.current)
+        orientationCheckIntervalRef.current = null
+      }
+      controlsAttachedRef.current = false
     }
   }, [])
 

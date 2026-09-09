@@ -595,7 +595,8 @@ body {
 .pause-shield {
   position: absolute;
   inset: 0;
-  background: rgba(165, 150, 150, 0.95) url('/assets/logo_no_bg.png') center/250px no-repeat;
+  /* Absolute path includes the Vite `base` (/KiddieTube/) so it resolves on GitHub Pages */
+  background: rgba(165, 150, 150, 0.95) url('/KiddieTube/assets/logo_no_bg.png') center/250px no-repeat;
   z-index: 9998;
   display: none;
   opacity: 0;

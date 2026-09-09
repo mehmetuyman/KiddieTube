@@ -33,16 +33,17 @@ const InstallPrompt: React.FC<InstallPromptProps> = ({ onClose }) => {
     };
 
     window.addEventListener('beforeinstallprompt', handler);
-    
+
     // Listen for successful installs through other means
-    window.addEventListener('appinstalled', () => {
+    const onAppInstalled = () => {
       localStorage.setItem(INSTALL_PROMPT_PREF_KEY, PROMPT_INSTALLED_VALUE);
       setIsVisible(false);
-    });
+    };
+    window.addEventListener('appinstalled', onAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
-      window.removeEventListener('appinstalled', () => {});
+      window.removeEventListener('appinstalled', onAppInstalled);
     };
   }, []);
 
@@ -79,9 +80,9 @@ const InstallPrompt: React.FC<InstallPromptProps> = ({ onClose }) => {
   return (
     <div className="install-prompt">
       <div className="install-prompt-content">
-        <img 
-          src="/assets/logo_no_bg.png" 
-          alt="KiddieTube Logo" 
+        <img
+          src={`${import.meta.env.BASE_URL}assets/logo_no_bg.png`}
+          alt="KiddieTube Logo"
           className="install-prompt-logo"
         />
         <h2>Install KiddieTube</h2>
