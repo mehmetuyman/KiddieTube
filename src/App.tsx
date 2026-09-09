@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import VideoGrid from './components/VideoGrid'
 import YouTubeWrapper from './components/YouTubeWrapper'
 import InstallPrompt from './components/InstallPrompt'
-
-type Video = { id: string; title: string; category: string }
+import ParentPanel, { requestParentAccess } from './components/ParentPanel'
+import { Video, loadVideos, LoadSource } from './lib/videoStore'
 
 // Category emoji mapping
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -23,26 +23,60 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
+  const [parentOpen, setParentOpen] = useState(false)
+  const [, setSource] = useState<LoadSource>('seed')
+
+  // long-press detection on the logo -> opens the (hidden) parent panel
+  const lpTimer = useRef<number | null>(null)
+  const lpFired = useRef(false)
+  const parentParamHandled = useRef(false)
+
+  const applyLoaded = (list: Video[], src: LoadSource) => {
+    setVideos(list)
+    setSource(src)
+    setActiveVideoId(prev => {
+      if (prev && list.some(v => v.id === prev)) return prev
+      return list.length ? list[0].id : null
+    })
+    if (list.length) {
+      setTimeout(() => {
+        const titleEl = document.getElementById('videoTitle')
+        const categoryEl = document.getElementById('videoCategory')
+        const current = list.find(v => v.id === (activeVideoId ?? list[0].id)) || list[0]
+        if (titleEl && titleEl.textContent === 'Select a video to begin') titleEl.textContent = current.title
+        if (categoryEl && !categoryEl.textContent) categoryEl.textContent = current.category
+      }, 100)
+    }
+  }
 
   useEffect(() => {
-    const base = import.meta.env.BASE_URL || '/'
-    fetch(`${base}videos.json`)
-      .then(r => r.json())
-      .then((data: Video[]) => {
-        setVideos(data)
-        if (data.length) {
-          setActiveVideoId(data[0].id)
-          // Update video info immediately for the first video
-          setTimeout(() => {
-            const titleEl = document.getElementById('videoTitle')
-            const categoryEl = document.getElementById('videoCategory')
-            if (titleEl) titleEl.textContent = data[0].title
-            if (categoryEl) categoryEl.textContent = data[0].category
-          }, 100)
-        }
-      })
+    loadVideos()
+      .then(({ doc, source }) => applyLoaded(doc.videos, source))
       .catch(err => console.error('Failed to load videos', err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (parentParamHandled.current) return
+    parentParamHandled.current = true
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('parent') === '1') openParent()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const reloadFromCloud = async () => {
+    try {
+      const { doc, source } = await loadVideos()
+      applyLoaded(doc.videos, source)
+    } catch (err) {
+      console.error('Refresh failed', err)
+    }
+  }
+
+  const handleVideosChange = (next: Video[]) => {
+    setVideos(next)
+    setActiveVideoId(cur => (cur && next.some(v => v.id === cur) ? cur : next[0]?.id ?? null))
+  }
 
   const categories = ['All', ...Array.from(new Set(videos.map((v: Video) => v.category)))]
   const filtered = activeCategory === 'All' ? videos : videos.filter((v: Video) => v.category === activeCategory)
@@ -63,13 +97,45 @@ export default function App() {
     }, 100)
   }
 
+  function openParent() {
+    if (!requestParentAccess()) return
+    setParentOpen(true)
+  }
+
+  // --- long-press on the logo ---
+  const startLongPress = () => {
+    lpFired.current = false
+    lpTimer.current = window.setTimeout(() => {
+      lpFired.current = true
+      if (navigator.vibrate) navigator.vibrate(30)
+      openParent()
+    }, 700)
+  }
+  const cancelLongPress = () => {
+    if (lpTimer.current) {
+      window.clearTimeout(lpTimer.current)
+      lpTimer.current = null
+    }
+  }
+  const handleBrandActivate = () => {
+    if (lpFired.current) {
+      lpFired.current = false
+      return // long-press already handled -> don't reload
+    }
+    window.location.reload()
+  }
+
   return (
     <div className="app-container">
       {/* Simple header with logo */}
       <header className="app-header">
-        <div 
+        <div
           className="brand-clickable"
-          onClick={() => window.location.reload()}
+          onClick={handleBrandActivate}
+          onPointerDown={startLongPress}
+          onPointerUp={cancelLongPress}
+          onPointerLeave={cancelLongPress}
+          onPointerCancel={cancelLongPress}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.location.reload() }}
@@ -158,6 +224,14 @@ export default function App() {
 
       <InstallPrompt onClose={() => {}} />
       <YouTubeWrapper videoId={activeVideoId} videos={videos} autoPlay={shouldAutoPlay} />
+
+      <ParentPanel
+        open={parentOpen}
+        onClose={() => setParentOpen(false)}
+        videos={videos}
+        onVideosChange={handleVideosChange}
+        onRefresh={reloadFromCloud}
+      />
     </div>
   )
 }
