@@ -31,10 +31,17 @@ export default function App() {
   const lpTimer = useRef<number | null>(null)
   const lpFired = useRef(false)
   const parentParamHandled = useRef(false)
+  const activeVideoIdRef = useRef<string | null>(null)
+  activeVideoIdRef.current = activeVideoId
 
   const applyList = (list: Video[]) => {
     setVideos(list)
-    setActiveVideoId(cur => (cur && list.some(v => v.id === cur) ? cur : list[0]?.id ?? null))
+    if (!activeVideoIdRef.current || !list.some(v => v.id === activeVideoIdRef.current)) {
+      // the current video went away (e.g. deleted in the parent panel): cue the
+      // replacement instead of auto-playing it behind the panel
+      setShouldAutoPlay(false)
+      setActiveVideoId(list[0]?.id ?? null)
+    }
     // a category can disappear when its last video is removed
     setActiveCategory(cat => (cat === 'All' || list.some(v => v.category === cat) ? cat : 'All'))
   }

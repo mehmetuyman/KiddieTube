@@ -167,6 +167,8 @@ function isVideo(v: any): v is Video {
   return (
     v &&
     typeof v.id === 'string' &&
+    ID_RE.test(v.id) && // ids end up in image URLs and the player - keep them strict
+
     typeof v.title === 'string' &&
     typeof v.category === 'string'
   )

@@ -39,6 +39,7 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
   const progressInputHandlerRef = useRef<(() => void) | null>(null)
   const progressChangeHandlerRef = useRef<(() => void) | null>(null)
   const seekingRef = useRef(false)
+  const seekIdleTimerRef = useRef<number | null>(null)
   const autoFullscreenRef = useRef(false)
   const lastLockStateRef = useRef<boolean | null>(null)
 
@@ -405,13 +406,19 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
     if (progressBar) {
       // While dragging only preview (allowSeekAhead=false); commit the real
       // seek once on release instead of a network request per pixel.
+      const onChange = () => {
+        if (seekIdleTimerRef.current) window.clearTimeout(seekIdleTimerRef.current)
+        seekIdleTimerRef.current = null
+        seekingRef.current = false
+        playerRef.current?.seekTo(Number(progressBar.value), true)
+      }
       const onInput = () => {
         seekingRef.current = true
         playerRef.current?.seekTo(Number(progressBar.value), false)
-      }
-      const onChange = () => {
-        seekingRef.current = false
-        playerRef.current?.seekTo(Number(progressBar.value), true)
+        // safety net: if `change` never arrives, commit after a pause in input
+        // so the bar can't stay frozen
+        if (seekIdleTimerRef.current) window.clearTimeout(seekIdleTimerRef.current)
+        seekIdleTimerRef.current = window.setTimeout(onChange, 1500)
       }
       progressBar.addEventListener('input', onInput)
       progressBar.addEventListener('change', onChange)
@@ -537,6 +544,10 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
       if (hideTimerRef.current) {
         window.clearTimeout(hideTimerRef.current)
         hideTimerRef.current = null
+      }
+      if (seekIdleTimerRef.current) {
+        window.clearTimeout(seekIdleTimerRef.current)
+        seekIdleTimerRef.current = null
       }
       if (progressIntervalRef.current) {
         window.clearInterval(progressIntervalRef.current)

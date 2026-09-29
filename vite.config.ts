@@ -33,6 +33,17 @@ export default defineConfig({
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
+      workbox: {
+        // The seed list isn't precached (it must pick up new deploys), but keep
+        // the last copy so an installed app still has videos when offline.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.endsWith('/videos.json'),
+            handler: 'NetworkFirst',
+            options: { cacheName: 'kiddietube-seed', networkTimeoutSeconds: 5 },
+          },
+        ],
+      },
     }),
   ],
 })
