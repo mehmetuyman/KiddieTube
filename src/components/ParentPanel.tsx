@@ -16,6 +16,7 @@ import {
   hasPin,
   setPin,
   verifyPin,
+  LoadSource,
 } from '../lib/videoStore'
 
 type Props = {
@@ -23,7 +24,7 @@ type Props = {
   onClose: () => void
   videos: Video[]
   onVideosChange: (videos: Video[]) => void
-  onRefresh: () => Promise<void> | void
+  onRefresh: () => Promise<LoadSource>
 }
 
 const NEW_CATEGORY = '__new__'
@@ -109,7 +110,7 @@ export default function ParentPanel({
 
   /* ---------------------------------------------------------------- */
 
-  async function runOp(op: Op, successMsg: string) {
+  async function runOp(op: Op | Op[], successMsg: string) {
     setBusy(true)
     setError(null)
     setNotice(null)
@@ -153,20 +154,23 @@ export default function ParentPanel({
   async function autofillFromUrl(raw: string) {
     const id = parseYouTubeId(raw)
     setForm((f) => (f ? { ...f, url: raw, videoId: id ?? '' } : f))
+    if (id && id === lastMetaIdRef.current) return // same video - already fetched
+    // Any change of id (including to "no id") invalidates an in-flight lookup,
+    // so a slow response can't fill in the title of a video no longer entered.
+    const reqId = ++metaReqRef.current
     if (!id) {
       lastMetaIdRef.current = ''
+      setFetchingMeta(false)
       return
     }
-    if (id === lastMetaIdRef.current) return // same video - already fetched
     lastMetaIdRef.current = id
-    const reqId = ++metaReqRef.current
     setFetchingMeta(true)
     const meta = await fetchYouTubeMeta(id)
     if (reqId !== metaReqRef.current) return
     setFetchingMeta(false)
     if (!meta) return
     setForm((f) => {
-      if (!f) return f
+      if (!f || f.videoId !== id) return f
       return {
         ...f,
         channel: meta.channel || f.channel,
@@ -194,8 +198,9 @@ export default function ParentPanel({
       return
     }
 
-    const duplicate = videos.find((v) => v.id === id)
-    if (form.mode === 'add' && duplicate) {
+    const idChanged = form.mode === 'add' || form.original?.id !== id
+    const duplicate = idChanged ? videos.find((v) => v.id === id) : undefined
+    if (duplicate) {
       setError(`That video is already in the list ("${duplicate.title}").`)
       return
     }
@@ -208,11 +213,13 @@ export default function ParentPanel({
       addedAt: form.original?.addedAt ?? new Date().toISOString(),
     }
 
-    let op: Op
+    let op: Op | Op[]
     if (form.mode === 'edit' && form.original && form.original.id !== id) {
-      // id changed on edit -> remove old entry, add new
-      await runOp({ type: 'delete', id: form.original.id }, 'Removed old entry')
-      op = { type: 'add', video }
+      // id changed on edit -> replace the old entry in one atomic commit
+      op = [
+        { type: 'delete', id: form.original.id },
+        { type: 'add', video },
+      ]
     } else {
       op = form.mode === 'add' ? { type: 'add', video } : { type: 'update', video }
     }
@@ -271,6 +278,21 @@ export default function ParentPanel({
       setGistId(id)
       await onRefresh()
       setNotice('Shared list created. Connect other devices with this same token + Gist ID.')
+    } catch (err: any) {
+      setError(err?.message || String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function refreshFromCloud() {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const source = await onRefresh()
+      if (source === 'gist') setNotice('List refreshed from the cloud.')
+      else setError("Couldn't reach the cloud list — showing this device's saved copy.")
     } catch (err: any) {
       setError(err?.message || String(err))
     } finally {
@@ -516,7 +538,7 @@ export default function ParentPanel({
                   Create shared list
                 </button>
                 {connected && (
-                  <button className="pp-btn pp-btn-ghost" onClick={() => onRefresh()} disabled={busy}>
+                  <button className="pp-btn pp-btn-ghost" onClick={refreshFromCloud} disabled={busy}>
                     Refresh from cloud
                   </button>
                 )}

@@ -23,37 +23,26 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
+  // bumped on every explicit tap so re-tapping the current video replays it
+  const [playRequest, setPlayRequest] = useState(0)
   const [parentOpen, setParentOpen] = useState(false)
-  const [, setSource] = useState<LoadSource>('seed')
 
   // long-press detection on the logo -> opens the (hidden) parent panel
   const lpTimer = useRef<number | null>(null)
   const lpFired = useRef(false)
   const parentParamHandled = useRef(false)
 
-  const applyLoaded = (list: Video[], src: LoadSource) => {
+  const applyList = (list: Video[]) => {
     setVideos(list)
-    setSource(src)
-    setActiveVideoId(prev => {
-      if (prev && list.some(v => v.id === prev)) return prev
-      return list.length ? list[0].id : null
-    })
-    if (list.length) {
-      setTimeout(() => {
-        const titleEl = document.getElementById('videoTitle')
-        const categoryEl = document.getElementById('videoCategory')
-        const current = list.find(v => v.id === (activeVideoId ?? list[0].id)) || list[0]
-        if (titleEl && titleEl.textContent === 'Select a video to begin') titleEl.textContent = current.title
-        if (categoryEl && !categoryEl.textContent) categoryEl.textContent = current.category
-      }, 100)
-    }
+    setActiveVideoId(cur => (cur && list.some(v => v.id === cur) ? cur : list[0]?.id ?? null))
+    // a category can disappear when its last video is removed
+    setActiveCategory(cat => (cat === 'All' || list.some(v => v.category === cat) ? cat : 'All'))
   }
 
   useEffect(() => {
     loadVideos()
-      .then(({ doc, source }) => applyLoaded(doc.videos, source))
+      .then(({ doc }) => applyList(doc.videos))
       .catch(err => console.error('Failed to load videos', err))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -64,22 +53,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const reloadFromCloud = async () => {
-    try {
-      const { doc, source } = await loadVideos()
-      applyLoaded(doc.videos, source)
-    } catch (err) {
-      console.error('Refresh failed', err)
-    }
-  }
-
-  const handleVideosChange = (next: Video[]) => {
-    setVideos(next)
-    setActiveVideoId(cur => (cur && next.some(v => v.id === cur) ? cur : next[0]?.id ?? null))
+  const reloadFromCloud = async (): Promise<LoadSource> => {
+    const { doc, source } = await loadVideos()
+    applyList(doc.videos)
+    return source
   }
 
   const categories = ['All', ...Array.from(new Set(videos.map((v: Video) => v.category)))]
   const filtered = activeCategory === 'All' ? videos : videos.filter((v: Video) => v.category === activeCategory)
+  const activeVideo = videos.find(v => v.id === activeVideoId) ?? null
 
   const getCategoryLabel = (cat: string) => {
     const emoji = CATEGORY_EMOJIS[cat] || '📺'
@@ -91,6 +73,7 @@ export default function App() {
   const handleVideoSelect = (id: string) => {
     setActiveVideoId(id)
     setShouldAutoPlay(true) // User explicitly clicked a video, auto-play it
+    setPlayRequest(n => n + 1)
     // Scroll to show full player at top
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -138,14 +121,15 @@ export default function App() {
           onPointerCancel={cancelLongPress}
           role="button"
           tabIndex={0}
+          onContextMenu={(e) => e.preventDefault()}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.location.reload() }}
           aria-label="Reload app"
           title="Reload app"
         >
-          <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Kiddie Tube" className="app-logo" />
+          <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Kiddie Tube" className="app-logo" draggable={false} />
           <span className="brand-title">Kiddie Tube</span>
         </div>
-        <span className="version-badge">v2.1.0</span>
+        <span className="version-badge">v{__APP_VERSION__}</span>
       </header>
 
       {/* Horizontal scrolling category pills */}
@@ -201,9 +185,9 @@ export default function App() {
             </div>
           </div>
 
-          <h1 className="video-title" id="videoTitle">Select a video to begin</h1>
+          <h1 className="video-title" id="videoTitle">{activeVideo ? activeVideo.title : 'Select a video to begin'}</h1>
           <div className="video-meta">
-            <p className="video-category" id="videoCategory"></p>
+            <p className="video-category" id="videoCategory">{activeVideo?.category ?? ''}</p>
             <span className="status-badge" id="videoStatus">Idle</span>
           </div>
         </div>
@@ -223,13 +207,13 @@ export default function App() {
       </section>
 
       <InstallPrompt onClose={() => {}} />
-      <YouTubeWrapper videoId={activeVideoId} videos={videos} autoPlay={shouldAutoPlay} />
+      <YouTubeWrapper videoId={activeVideoId} autoPlay={shouldAutoPlay} playRequest={playRequest} />
 
       <ParentPanel
         open={parentOpen}
         onClose={() => setParentOpen(false)}
         videos={videos}
-        onVideosChange={handleVideosChange}
+        onVideosChange={applyList}
         onRefresh={reloadFromCloud}
       />
     </div>

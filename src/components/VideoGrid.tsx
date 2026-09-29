@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
-
-type Video = { id: string; title: string; category: string }
+import { Video } from '../lib/videoStore'
 
 type Props = {
   videos: Video[]
@@ -11,15 +10,18 @@ type Props = {
 export default function VideoGrid({ videos, activeVideoId, onSelect }: Props) {
   const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(new Set())
 
-  const getThumbnailUrl = (videoId: string, useHq: boolean = false) => {
-    if (useHq || failedThumbnails.has(videoId)) {
-      return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+  // hqdefault (480x360) exists for every video and is plenty for a grid card;
+  // maxresdefault is ~1280x720, often missing, and heavy on mobile data.
+  const getThumbnailUrl = (videoId: string) => {
+    if (failedThumbnails.has(videoId)) {
+      return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
     }
-    return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
   }
 
   const handleThumbnailError = (videoId: string) => {
-    setFailedThumbnails(prev => new Set(prev).add(videoId))
+    // only fall back once, so a missing fallback can't loop
+    setFailedThumbnails(prev => (prev.has(videoId) ? prev : new Set(prev).add(videoId)))
   }
 
   return (

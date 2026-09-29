@@ -233,8 +233,12 @@ export async function readGistDoc(
   config: GistConfig | null = getGistConfig(),
 ): Promise<VideoDoc | null> {
   if (!config || !config.gistId) return null
+  // GitHub serves gists with `Cache-Control: max-age=60`. Bypass the HTTP
+  // cache, otherwise a read right after a write returns the old list and the
+  // next commitOp() silently drops the previous edit.
   const res = await fetch(`${GH_API}/gists/${config.gistId}`, {
     headers: ghHeaders(config.token),
+    cache: 'no-store',
   })
   if (!res.ok) throw new Error(ghMessage(res.status, 'Load list'))
 
@@ -245,7 +249,9 @@ export async function readGistDoc(
 
   let content: string = file.content ?? ''
   if (file.truncated && file.raw_url) {
-    content = await (await fetch(file.raw_url)).text()
+    const raw = await fetch(file.raw_url, { cache: 'no-store' })
+    if (!raw.ok) throw new Error(ghMessage(raw.status, 'Load list'))
+    content = await raw.text()
   }
   if (!content) return { version: DOC_VERSION, updatedAt: '', videos: [] }
   return normalizeDoc(JSON.parse(content))
@@ -266,6 +272,7 @@ export async function writeGistDoc(
   const res = await fetch(`${GH_API}/gists/${config.gistId}`, {
     method: 'PATCH',
     headers: ghHeaders(config.token, true),
+    cache: 'no-store',
     body: JSON.stringify({
       files: { [config.filename]: { content: JSON.stringify(stamped, null, 2) } },
     }),
@@ -343,6 +350,10 @@ export type Op =
   | { type: 'delete'; id: string }
   | { type: 'replace'; videos: Video[] }
 
+export function applyOps(list: Video[], ops: Op | Op[]): Video[] {
+  return (Array.isArray(ops) ? ops : [ops]).reduce(applyOp, list)
+}
+
 export function applyOp(list: Video[], op: Op): Video[] {
   switch (op.type) {
     case 'add':
@@ -360,31 +371,27 @@ export function applyOp(list: Video[], op: Op): Video[] {
 }
 
 /**
- * Apply an edit and persist it.
+ * Apply one or more edits atomically and persist them.
  *
- * With a Gist configured: re-read the latest remote list, apply the op on top of
- * it (so a concurrent add/edit from another device is preserved), write it back.
+ * With a Gist configured: re-read the latest remote list, apply the ops on top
+ * of it (so a concurrent add/edit from another device is preserved), write it
+ * back. If the remote list can't be read the edit fails rather than overwriting
+ * the shared list with this device's possibly stale copy.
  * Without a Gist: apply against `current` and save to the local cache only.
  *
  * Returns the resulting video list.
  */
-export async function commitOp(current: Video[], op: Op): Promise<Video[]> {
+export async function commitOp(current: Video[], ops: Op | Op[]): Promise<Video[]> {
   const config = getGistConfig()
 
   if (config && config.gistId) {
-    let base = current
-    try {
-      const remote = await readGistDoc(config)
-      if (remote) base = remote.videos
-    } catch {
-      /* remote unreadable - fall back to current in-memory list */
-    }
-    const next = applyOp(base, op)
+    const remote = await readGistDoc(config)
+    const next = applyOps(remote ? remote.videos : current, ops)
     const saved = await writeGistDoc({ version: DOC_VERSION, updatedAt: '', videos: next }, config)
     return saved.videos
   }
 
-  const next = applyOp(current, op)
+  const next = applyOps(current, ops)
   writeCache({ version: DOC_VERSION, updatedAt: new Date().toISOString(), videos: next })
   return next
 }

@@ -1,12 +1,13 @@
 {
   "name": "kiddietube-react",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
@@ -23,5 +24,8 @@
     "typescript": "^5.1.6",
     "vite": "^7.1.9",
     "vite-plugin-pwa": "^1.0.3"
+  },
+  "engines": {
+    "node": ">=20.19"
   }
 }
