@@ -181,6 +181,56 @@ body.pseudo-fullscreen .app-top {
   display: none !important;
 }
 
+/* Phones in landscape: two full-size rows took half the screen height. Put
+   the logo and the category row side by side in one slim row instead (the
+   logo keeps its long-press). Compact-on-scroll then has nothing left to do. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app-top {
+    display: flex;
+    align-items: stretch;
+  }
+  .app-top .app-header,
+  .app-top.is-compact .app-header {
+    flex: none;
+    padding: 4px 10px;
+  }
+  .app-top .brand-clickable {
+    gap: 8px;
+  }
+  .app-top .app-logo {
+    width: 30px;
+    height: 30px;
+  }
+  .app-top .brand-title {
+    font-size: 1rem;
+  }
+  .app-top .version-badge {
+    display: none;
+  }
+  .app-top .category-pills-container,
+  .app-top.is-compact .category-pills-container {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+  }
+  .app-top .category-pills {
+    gap: 8px;
+    padding: 2px 4px;
+  }
+  .app-top .category-pill {
+    padding: 4px 12px;
+  }
+  .app-top .category-pill.active {
+    transform: scale(1.05);
+  }
+  .app-top .category-emoji {
+    font-size: 1rem;
+  }
+  .app-top .category-name {
+    font-size: 0.8rem;
+  }
+}
+
 /* ========== Header ========== */
 .app-header {
   background: var(--kt-header-bg);
