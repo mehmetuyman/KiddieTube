@@ -330,6 +330,16 @@ body.pseudo-fullscreen .app-top {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
+/* The player's layers use very high z-indexes (tap guard 9997, pause shield
+   9998, controls 10000). Keep them inside the player so they can't cover the
+   frozen top bar (z 1000) when the player scrolls underneath it - otherwise
+   the invisible guard swallows taps/scrolls meant for the categories and the
+   pause screen draws over the bar. Not in pseudo-fullscreen: there the player
+   must cover the whole page (native fullscreen uses the top layer anyway). */
+body:not(.pseudo-fullscreen) .player-section {
+  isolation: isolate;
+}
+
 .video-container {
   position: relative;
 }
