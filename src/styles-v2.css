@@ -97,6 +97,85 @@ body {
   -webkit-user-drag: none;
 }
 
+/* ========== Frozen top block (header + category row) ==========
+   Stays at the top while the page scrolls and shrinks to a compact size once
+   scrolled (class set by useCompactOnScroll, which also adds the height it
+   gives up back as margin-bottom so the content below doesn't jump). Every
+   height-affecting property shares --kt-compact-t so the two stay in step.
+   Sits below the parent panel and fullscreen video. */
+.app-top {
+  --kt-compact-t: 0.25s ease;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  transition: margin-bottom var(--kt-compact-t);
+}
+
+.app-top .app-header,
+.app-top .app-logo,
+.app-top .brand-title,
+.app-top .version-badge,
+.app-top .category-pills-container,
+.app-top .category-pills,
+.app-top .category-pill,
+.app-top .category-emoji,
+.app-top .category-name {
+  transition: padding var(--kt-compact-t), width var(--kt-compact-t), height var(--kt-compact-t),
+    font-size var(--kt-compact-t), transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+/* measuring pass: no animation */
+.app-top.is-measuring,
+.app-top.is-measuring * {
+  transition: none !important;
+}
+
+.app-top.is-compact .app-header {
+  padding: 4px 12px;
+}
+
+.app-top.is-compact .app-logo {
+  width: 30px;
+  height: 30px;
+}
+
+.app-top.is-compact .brand-title {
+  font-size: 1.15rem;
+}
+
+.app-top.is-compact .version-badge {
+  padding: 2px 8px;
+  font-size: 0.65rem;
+}
+
+.app-top.is-compact .category-pills-container {
+  padding: 4px 12px;
+}
+
+.app-top.is-compact .category-pills {
+  padding: 2px 4px;
+}
+
+.app-top.is-compact .category-pill {
+  padding: 4px 12px;
+}
+
+.app-top.is-compact .category-pill.active {
+  transform: scale(1.05);
+}
+
+.app-top.is-compact .category-emoji {
+  font-size: 1rem;
+}
+
+.app-top.is-compact .category-name {
+  font-size: 0.8rem;
+}
+
+body.pseudo-fullscreen .app-top {
+  display: none !important;
+}
+
 /* ========== Header ========== */
 .app-header {
   background: var(--kt-header-bg);
@@ -105,9 +184,6 @@ body {
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  position: sticky;
-  top: 0;
-  z-index: 1000;
 }
 
 .brand-clickable {
@@ -164,6 +240,9 @@ body {
   /* Hide scrollbar */
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* some themes use a translucent bar - soften what scrolls underneath */
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .category-pills-container::-webkit-scrollbar {

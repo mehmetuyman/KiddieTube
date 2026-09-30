@@ -5,6 +5,7 @@ import InstallPrompt from './components/InstallPrompt'
 import ParentPanel, { requestParentAccess } from './components/ParentPanel'
 import { Video, loadVideos, LoadSource, sortNewestFirst, visibleVideos } from './lib/videoStore'
 import { useDragScroll } from './lib/useDragScroll'
+import { useCompactOnScroll } from './lib/useCompactOnScroll'
 
 // Category emoji mapping
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -36,6 +37,26 @@ export default function App() {
   // category row: wheel + click-drag scrolling for mouse users (desktop / installed app)
   const pillsRef = useRef<HTMLDivElement>(null)
   useDragScroll(pillsRef)
+
+  // Picking a category from the frozen row while scrolled into the grid: jump
+  // to the start of that category's videos instead of leaving the view in the
+  // middle of a list that just changed. Above the grid (player visible): stay.
+  const gridRef = useRef<HTMLElement>(null)
+  const showGridStart = () => {
+    const grid = gridRef.current
+    const bar = topRef.current
+    if (!grid || !bar) return
+    const barBottom = bar.getBoundingClientRect().bottom
+    const gridTop = grid.getBoundingClientRect().top
+    if (gridTop < barBottom) {
+      window.scrollTo({ top: window.scrollY + gridTop - barBottom, behavior: 'smooth' })
+    }
+  }
+
+  // Header + category row are frozen at the top together and shrink to a
+  // compact size once the page scrolls (see useCompactOnScroll).
+  const topRef = useRef<HTMLDivElement>(null)
+  useCompactOnScroll(topRef)
   activeVideoIdRef.current = activeVideoId
 
   const applyList = (loaded: Video[]) => {
@@ -141,49 +162,53 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Simple header with logo */}
-      <header className="app-header">
-        <div
-          className="brand-clickable"
-          onClick={handleBrandActivate}
-          onPointerDown={startLongPress}
-          onPointerUp={cancelLongPress}
-          onPointerLeave={cancelLongPress}
-          onPointerCancel={cancelLongPress}
-          role="button"
-          tabIndex={0}
-          onContextMenu={(e) => e.preventDefault()}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.location.reload() }}
-          aria-label="Reload app"
-          title="Reload app"
-        >
-          <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Kiddie Tube" className="app-logo" draggable={false} />
-          <span className="brand-title">Kiddie Tube</span>
-        </div>
-        <span className="version-badge">v{__APP_VERSION__}</span>
-      </header>
+      {/* Frozen top block: header + category row (compacts while scrolled) */}
+      <div className="app-top" ref={topRef}>
+        {/* Simple header with logo */}
+        <header className="app-header">
+          <div
+            className="brand-clickable"
+            onClick={handleBrandActivate}
+            onPointerDown={startLongPress}
+            onPointerUp={cancelLongPress}
+            onPointerLeave={cancelLongPress}
+            onPointerCancel={cancelLongPress}
+            role="button"
+            tabIndex={0}
+            onContextMenu={(e) => e.preventDefault()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.location.reload() }}
+            aria-label="Reload app"
+            title="Reload app"
+          >
+            <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Kiddie Tube" className="app-logo" draggable={false} />
+            <span className="brand-title">Kiddie Tube</span>
+          </div>
+          <span className="version-badge">v{__APP_VERSION__}</span>
+        </header>
 
-      {/* Horizontal scrolling category pills */}
-      <div className="category-pills-container" ref={pillsRef}>
-        <div className="category-pills">
-          {categories.map(cat => {
-            const { emoji, shortName } = getCategoryLabel(cat)
-            return (
-              <button
-                key={cat}
-                className={`category-pill ${cat === activeCategory ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveCategory(cat)
-                  const filteredForCat = cat === 'All' ? shownVideos : shownVideos.filter((v: Video) => v.category === cat)
-                  setActiveVideoId(filteredForCat.length ? filteredForCat[0].id : null)
-                  setShouldAutoPlay(false) // Don't auto-play on category change
-                }}
-              >
-                <span className="category-emoji">{emoji}</span>
-                <span className="category-name">{shortName}</span>
-              </button>
-            )
-          })}
+        {/* Horizontal scrolling category pills */}
+        <div className="category-pills-container" ref={pillsRef}>
+          <div className="category-pills">
+            {categories.map(cat => {
+              const { emoji, shortName } = getCategoryLabel(cat)
+              return (
+                <button
+                  key={cat}
+                  className={`category-pill ${cat === activeCategory ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveCategory(cat)
+                    const filteredForCat = cat === 'All' ? shownVideos : shownVideos.filter((v: Video) => v.category === cat)
+                    setActiveVideoId(filteredForCat.length ? filteredForCat[0].id : null)
+                    setShouldAutoPlay(false) // Don't auto-play on category change
+                    showGridStart()
+                  }}
+                >
+                  <span className="category-emoji">{emoji}</span>
+                  <span className="category-name">{shortName}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
@@ -226,7 +251,7 @@ export default function App() {
       </section>
 
       {/* Video grid */}
-      <section className="video-grid-section">
+      <section className="video-grid-section" ref={gridRef}>
         <div className="grid-header">
           <span className="grid-title">{activeCategory === 'All' ? 'All Videos' : getCategoryLabel(activeCategory).shortName}</span>
           <span className="grid-count">{filtered.length} videos</span>
