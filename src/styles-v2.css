@@ -101,19 +101,26 @@ body {
   -webkit-user-drag: none;
 }
 
-/* ========== Frozen top block (header + category row) ==========
-   Stays at the top while the page scrolls and shrinks to a compact size once
-   scrolled (class set by useCompactOnScroll, which also adds the height it
-   gives up back as margin-bottom so the content below doesn't jump). Every
-   height-affecting property shares --kt-compact-t so the two stay in step.
+/* ========== Pinned top block (header + category row) ==========
+   Fixed to the top of the screen (sticky was unreliable on iPhone) and shrinks
+   to a compact size once scrolled (class set by useCompactOnScroll). Being
+   fixed it takes no room in the page; .app-top-spacer holds its full height
+   (set by the same hook) so content starts below it and never jumps.
    Sits below the parent panel and fullscreen video. */
 .app-top {
   --kt-compact-t: 0.25s ease;
-  position: -webkit-sticky; /* older iOS */
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
+  /* same width/centering as .app-container */
+  max-width: 1200px;
+  margin: 0 auto;
   z-index: 1000;
-  transition: margin-bottom var(--kt-compact-t);
+}
+
+.app-top-spacer {
+  height: 178px; /* replaced by the measured full height */
 }
 
 .app-top .app-header,

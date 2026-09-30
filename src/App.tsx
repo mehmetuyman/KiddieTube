@@ -53,10 +53,11 @@ export default function App() {
     }
   }
 
-  // Header + category row are frozen at the top together and shrink to a
+  // Header + category row are pinned to the top together and shrink to a
   // compact size once the page scrolls (see useCompactOnScroll).
   const topRef = useRef<HTMLDivElement>(null)
-  useCompactOnScroll(topRef)
+  const topSpacerRef = useRef<HTMLDivElement>(null)
+  useCompactOnScroll(topRef, topSpacerRef)
   activeVideoIdRef.current = activeVideoId
 
   const applyList = (loaded: Video[]) => {
@@ -211,6 +212,8 @@ export default function App() {
           </div>
         </div>
       </div>
+      {/* the bar is fixed (out of the page flow); this keeps its full-size room */}
+      <div className="app-top-spacer" ref={topSpacerRef} aria-hidden="true" />
 
       {/* Video player - sticky on mobile */}
       <section className="player-section">

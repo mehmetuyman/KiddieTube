@@ -4,72 +4,73 @@ const COMPACT_AT = 40 // px scrolled before the top bar shrinks
 const EXPAND_AT = 8 // ...and back near the very top it grows again
 
 /**
- * Shrink a sticky top block (header + category row) once the page scrolls, and
- * grow it back at the top - without the content underneath jumping.
+ * Top bar (header + category row) pinned to the top of the screen, shrinking
+ * to a compact size once the page scrolls and growing back at the top.
  *
- * A sticky element still takes up space in the page flow, so shrinking it
- * would pull everything below it up. To prevent that, the height it gives up is
- * added back as `margin-bottom` (both animate with the same timing in CSS, so
- * their sum - the space in the flow - stays constant).
+ * The bar is `position: fixed` rather than sticky: sticky proved unreliable on
+ * iPhone (any ancestor overflow setting silently disables it), while fixed is
+ * independent of the page structure. Being fixed, it takes no space in the
+ * page, so `spacerRef` - an empty element right after it - is kept at the bar's
+ * FULL height. The spacer never changes when the bar compacts, so the content
+ * below can't jump.
  *
- * Adds `is-compact` to the element; the compact look lives in CSS.
+ * Adds `is-compact` to the bar; the compact look lives in CSS.
  */
-export function useCompactOnScroll(ref: RefObject<HTMLElement>) {
+export function useCompactOnScroll(ref: RefObject<HTMLElement>, spacerRef: RefObject<HTMLElement>) {
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    const spacer = spacerRef.current
+    if (!el || !spacer) return
 
     let compact = false
+    let toggledAt = 0 // the size switch itself isn't a content change - don't re-measure mid-animation
 
-    // Height difference between the full and compact layout, measured with
-    // transitions off (fonts, theme and screen width all affect it).
-    const measureDelta = (): number => {
+    // Full-size height, measured with the compact look and transitions off
+    // (fonts, theme, orientation and screen width all affect it).
+    const syncSpacer = () => {
       el.classList.add('is-measuring')
+      if (compact) el.classList.remove('is-compact')
       const full = el.offsetHeight
-      el.classList.add('is-compact')
-      const small = el.offsetHeight
-      el.classList.remove('is-compact')
-      void el.offsetHeight // commit the full layout before transitions resume
+      if (compact) el.classList.add('is-compact')
+      void el.offsetHeight // commit before transitions resume
       el.classList.remove('is-measuring')
-      return Math.max(0, full - small)
-    }
-
-    const setCompact = (next: boolean) => {
-      if (next === compact) return
-      compact = next
-      if (next) {
-        const delta = measureDelta()
-        el.classList.add('is-compact')
-        el.style.marginBottom = `${delta}px`
-      } else {
-        el.classList.remove('is-compact')
-        el.style.marginBottom = '0px'
-      }
+      if (full > 0) spacer.style.height = `${full}px`
     }
 
     // Cheap enough to run on every scroll event: it only touches the DOM when
     // crossing a threshold.
     const onScroll = () => {
       const y = window.scrollY
-      if (!compact && y > COMPACT_AT) setCompact(true)
-      else if (compact && y <= EXPAND_AT) setCompact(false)
+      if (!compact && y > COMPACT_AT) {
+        compact = true
+        toggledAt = Date.now()
+        el.classList.add('is-compact')
+      } else if (compact && y <= EXPAND_AT) {
+        compact = false
+        toggledAt = Date.now()
+        el.classList.remove('is-compact')
+      }
     }
 
-    // a resize/rotation changes the sizes; re-measure by toggling back
-    const onResize = () => {
-      if (!compact) return
-      compact = false
-      el.classList.remove('is-compact')
-      el.style.marginBottom = '0px'
-      onScroll()
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onResize)
+    syncSpacer()
     onScroll() // e.g. reload while scrolled down
+
+    // re-measure when the bar's content or the screen changes
+    const ro =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => {
+            if (!compact && Date.now() - toggledAt > 400) syncSpacer()
+          })
+        : null
+    ro?.observe(el)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', syncSpacer)
+    document.fonts?.ready.then(syncSpacer).catch(() => {})
+
     return () => {
+      ro?.disconnect()
       window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onResize)
+      window.removeEventListener('resize', syncSpacer)
     }
-  }, [ref])
+  }, [ref, spacerRef])
 }
