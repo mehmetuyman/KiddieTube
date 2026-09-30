@@ -78,6 +78,25 @@ body {
   padding: 0;
 }
 
+/* Nothing on the kids' page is meant to be selected or saved. On phones a
+   long press (e.g. on the logo to open the parent panel) otherwise selects
+   nearby text/emoji or pops the "save image" menu on thumbnails. The parent
+   panel (.pp-overlay) is outside these and stays selectable/editable. */
+.app-header,
+.category-pills-container,
+.player-section,
+.video-grid-section {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-header img,
+.video-grid-section img {
+  -webkit-user-drag: none;
+}
+
 /* ========== Header ========== */
 .app-header {
   background: var(--kt-header-bg);

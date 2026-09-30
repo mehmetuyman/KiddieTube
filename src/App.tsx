@@ -97,9 +97,22 @@ export default function App() {
     }, 100)
   }
 
+  // A phone's own long-press gesture (~0.5s) starts selecting text/icons near
+  // the finger before our 0.7s timer fires; drop that selection.
+  function clearSelection() {
+    try {
+      window.getSelection()?.removeAllRanges()
+    } catch {
+      /* ignore */
+    }
+  }
+
   function openParent() {
+    clearSelection()
     if (!requestParentAccess()) return
     setParentOpen(true)
+    // the OS may extend the selection until the finger lifts
+    window.setTimeout(clearSelection, 50)
   }
 
   // --- long-press on the logo ---
@@ -112,6 +125,7 @@ export default function App() {
     }, 700)
   }
   const cancelLongPress = () => {
+    if (lpFired.current) clearSelection() // finger lifted after the panel opened
     if (lpTimer.current) {
       window.clearTimeout(lpTimer.current)
       lpTimer.current = null
