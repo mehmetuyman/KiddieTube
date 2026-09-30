@@ -36,7 +36,18 @@ to gate re-opening. The panel always closes on reload.
 - **Add**: paste a YouTube link (or an 11-char video ID). The title is fetched
   automatically via YouTube's public oEmbed endpoint and stays editable; pick a
   category from the existing list or type a new one.
-- **Edit / Delete**: per-row in the Videos tab.
+- **Edit / Hide / Delete**: per-row in the Videos tab. **Hide** removes a video
+  from the kids' page but keeps it in the list (dimmed, tagged "Hidden");
+  **Unhide** brings it back. Filter the list by All / Visible / Hidden.
+- **Order**: videos added from the panel are shown first, newest on top; the
+  bundled videos follow in their original order.
+
+## Player
+
+Custom controls over the YouTube player: play/pause, ±10s, seek bar,
+fullscreen, and a **speed** button that cycles 0.5x → 0.75x → 1x → 1.25x → 1.5x
+(limited to what the video supports). The chosen speed is remembered on the
+device and re-applied to every video.
 
 **Where changes are stored** (`src/lib/videoStore.ts`)
 1. If a shared GitHub Gist is configured on the device, edits are written there

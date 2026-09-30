@@ -239,9 +239,28 @@ body {
 }
 
 @media (max-width: 480px) {
+  /* Too narrow for one row (the buttons plus a usable seek bar overflowed and
+     clipped the fullscreen button): seek bar + times on top, buttons below. */
   .controls-bottom {
     gap: 6px;
     padding: 8px 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 4px; /* applied twice around the zero-height break */
+  }
+  .controls-bottom #currentTime { order: -3; }
+  .controls-bottom .progress-slider {
+    order: -2;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .controls-bottom #duration { order: -1; }
+  /* forces the buttons onto the second row */
+  .controls-bottom::after {
+    content: '';
+    order: -1;
+    flex-basis: 100%;
+    height: 0;
   }
 }
 
@@ -365,6 +384,35 @@ body {
   }
   .skip-icon sub {
     font-size: 0.55rem;
+  }
+}
+
+.control-btn-speed {
+  min-width: 44px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 16px;
+  border: none;
+  background: #e3e8ef;
+  color: #35506b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.control-btn-speed.active {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  color: #fff;
+}
+
+@media (max-width: 480px) {
+  .control-btn-speed {
+    min-width: 38px;
+    height: 28px;
+    padding: 0 6px;
+    font-size: 0.72rem;
   }
 }
 

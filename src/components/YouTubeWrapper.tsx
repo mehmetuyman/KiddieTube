@@ -11,6 +11,24 @@ const YT_PLAYER_VARS = {
   origin: window.location.origin,
 }
 
+// Speeds offered by the speed button (cycled in order), limited to what the
+// current video supports.
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5]
+const LS_SPEED = 'kiddietube-playback-rate'
+
+function readSavedSpeed(): number {
+  try {
+    const n = Number(localStorage.getItem(LS_SPEED))
+    return SPEEDS.includes(n) ? n : 1
+  } catch {
+    return 1
+  }
+}
+
+function formatSpeed(rate: number): string {
+  return `${rate}x`
+}
+
 type Props = {
   videoId: string | null
   autoPlay?: boolean
@@ -42,6 +60,9 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
   const seekIdleTimerRef = useRef<number | null>(null)
   const autoFullscreenRef = useRef(false)
   const lastLockStateRef = useRef<boolean | null>(null)
+  // the speed the parent picked; re-applied because YouTube can reset it to 1
+  // when a new video loads
+  const speedRef = useRef<number>(readSavedSpeed())
 
   useEffect(() => {
     if (!document.getElementById('youtube-iframe-api')) {
@@ -70,6 +91,7 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
             attachControls()
           },
           onStateChange: (e: any) => handleStateChange(e),
+          onPlaybackRateChange: (e: any) => updateSpeedLabel(e.data),
         },
       })
     }
@@ -143,6 +165,28 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
     }
   }
 
+  function updateSpeedLabel(rate?: number) {
+    const btn = document.getElementById('btnSpeed')
+    if (!btn) return
+    const r = typeof rate === 'number' ? rate : playerRef.current?.getPlaybackRate?.() ?? speedRef.current
+    btn.textContent = formatSpeed(r)
+    btn.classList.toggle('active', r !== 1)
+  }
+
+  function availableSpeeds(): number[] {
+    const supported: number[] = playerRef.current?.getAvailablePlaybackRates?.() ?? []
+    const usable = SPEEDS.filter((s) => supported.includes(s))
+    return usable.length ? usable : SPEEDS
+  }
+
+  // Apply the chosen speed to the current video if it differs.
+  function applySpeed() {
+    const p = playerRef.current
+    if (!p?.setPlaybackRate) return
+    if (p.getPlaybackRate?.() !== speedRef.current) p.setPlaybackRate(speedRef.current)
+    updateSpeedLabel()
+  }
+
   function exitPseudoFullscreen() {
     autoFullscreenRef.current = false
     document.body.classList.remove('pseudo-fullscreen')
@@ -200,6 +244,26 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
           btnPlayPause.textContent = '⏸'
         }
       }
+    }
+
+    // Playback speed: cycle through the speeds this video supports
+    const btnSpeed = document.getElementById('btnSpeed')
+    if (btnSpeed) {
+      btnSpeed.onclick = () => {
+        if (!playerRef.current) return
+        const speeds = availableSpeeds()
+        const i = speeds.indexOf(speedRef.current)
+        const next = speeds[(i + 1) % speeds.length] ?? 1
+        speedRef.current = next
+        try {
+          localStorage.setItem(LS_SPEED, String(next))
+        } catch {
+          /* ignore */
+        }
+        playerRef.current.setPlaybackRate(next)
+        updateSpeedLabel(next)
+      }
+      updateSpeedLabel(speedRef.current)
     }
 
     // Skip backward 10 seconds
@@ -508,6 +572,9 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
         }
       }
     }
+
+    // a newly loaded video may start at 1x - put the chosen speed back
+    if (event.data === 1 || event.data === 5) applySpeed()
 
     // Update button states when player state changes
     updateButtonStates()

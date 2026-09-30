@@ -194,6 +194,7 @@ export default function App() {
               <span id="currentTime" className="time-display">0:00</span>
               <input type="range" id="progressBar" className="progress-slider" defaultValue={0} min={0} max={100} />
               <span id="duration" className="time-display">0:00</span>
+              <button id="btnSpeed" className="control-btn-speed" title="Playback speed" aria-label="Playback speed">1x</button>
               <button id="btnFullscreen" className="control-btn-fullscreen">⛶</button>
             </div>
           </div>
