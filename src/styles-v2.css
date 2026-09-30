@@ -69,7 +69,11 @@ body {
   background: var(--kt-bg);
   min-height: 100vh;
   min-height: 100dvh;
+  /* `clip`, not `hidden`: on iOS Safari `overflow-x: hidden` on body stops
+     position: sticky from working (the frozen header/category bar). `hidden`
+     stays as the fallback for browsers without `clip`. */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .app-container {
@@ -105,6 +109,7 @@ body {
    Sits below the parent panel and fullscreen video. */
 .app-top {
   --kt-compact-t: 0.25s ease;
+  position: -webkit-sticky; /* older iOS */
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -940,8 +945,24 @@ body.pseudo-fullscreen .video-container {
 body.pseudo-fullscreen {
   overflow: hidden !important;
   position: fixed !important;
+  /* `top` is set inline to -scrollY so the page stays where it was
+     (YouTubeWrapper.enterPseudoFullscreen) */
+  left: 0;
+  right: 0;
   width: 100% !important;
   height: 100% !important;
+}
+
+/* Give the overlay controls their own compositing layers so iOS WebKit
+   hit-tests them above the YouTube iframe (it otherwise can hand taps to the
+   iframe's layer after a rotation even though the controls are drawn on top). */
+.video-container.pseudo-fullscreen .custom-controls {
+  transform: translate3d(-50%, 0, 0);
+}
+
+.video-container.pseudo-fullscreen .control-btn-topright,
+.video-container.pseudo-fullscreen .iframe-guard-full {
+  transform: translateZ(0);
 }
 
 body.pseudo-fullscreen .app-header {

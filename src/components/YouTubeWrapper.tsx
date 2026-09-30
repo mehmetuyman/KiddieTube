@@ -59,6 +59,9 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
   const seekingRef = useRef(false)
   const seekIdleTimerRef = useRef<number | null>(null)
   const autoFullscreenRef = useRef(false)
+  const lockedScrollRef = useRef(0) // page scroll position while pseudo-fullscreen
+  const viewportHandlerRef = useRef<(() => void) | null>(null)
+  const touchShownAtRef = useRef(0) // when a touch last revealed the controls
   const lastLockStateRef = useRef<boolean | null>(null)
   // the speed the parent picked; re-applied because YouTube can reset it to 1
   // when a new video loads
@@ -187,15 +190,52 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
     updateSpeedLabel()
   }
 
+  // Pseudo-fullscreen = the player container covers the viewport (position:
+  // fixed) and the page underneath is locked. It's the only fullscreen iPhones
+  // get. The page is locked *at its current scroll position* (body fixed with a
+  // negative top) and put back on exit: pinning it at 0 made the page jump,
+  // lost the scroll position, and on iOS left touch targets out of step with
+  // what's drawn after a rotation.
+  function enterPseudoFullscreen(auto: boolean) {
+    const container = document.querySelector('.video-container') as HTMLElement | null
+    if (!container || container.classList.contains('pseudo-fullscreen')) return
+    const y = window.scrollY
+    lockedScrollRef.current = y
+    document.body.style.top = `-${y}px`
+    document.body.classList.add('pseudo-fullscreen')
+    container.classList.add('pseudo-fullscreen')
+    autoFullscreenRef.current = auto
+    updateButtonStates()
+  }
+
   function exitPseudoFullscreen() {
     autoFullscreenRef.current = false
+    const wasPseudo = document.body.classList.contains('pseudo-fullscreen')
     document.body.classList.remove('pseudo-fullscreen')
+    document.body.style.top = ''
     document.querySelector('.video-container.pseudo-fullscreen')?.classList.remove('pseudo-fullscreen')
+    // instant: Bootstrap turns on smooth scrolling for the whole page, which
+    // would visibly scroll down from the top
+    if (wasPseudo) window.scrollTo({ top: lockedScrollRef.current, behavior: 'instant' as ScrollBehavior })
     // overlay controls are only shown in fullscreen
     document.querySelector('.custom-controls')?.classList.remove('visible')
     document.getElementById('btnExitPseudoFs')?.classList.remove('visible')
     controlsVisibleRef.current = false
     updateButtonStates()
+  }
+
+  // iOS WebKit keeps stale touch targets for fixed-position layers after a
+  // rotation (drawn in the new place, tappable in the old one - rotating back
+  // "fixes" it). Rebuilding the overlay layers once the rotation has settled
+  // makes it recompute them.
+  function refreshOverlayLayers() {
+    if (!document.body.classList.contains('pseudo-fullscreen')) return
+    const els = document.querySelectorAll<HTMLElement>(
+      '.video-container .custom-controls, #btnExitPseudoFs, .video-container .iframe-guard-full',
+    )
+    els.forEach((el) => (el.style.display = 'none'))
+    void document.body.offsetHeight
+    els.forEach((el) => (el.style.display = ''))
   }
 
   // Lock to portrait when not playing, allow rotation when playing. Driven by
@@ -333,12 +373,7 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
         }
 
         // fallback: pseudo-fullscreen (cover viewport with fixed positioned container)
-        const enterPseudo = () => {
-          if (!container) return
-          document.body.classList.add('pseudo-fullscreen')
-          container.classList.add('pseudo-fullscreen')
-          updateButtonStates()
-        }
+        const enterPseudo = () => enterPseudoFullscreen(false)
 
         // Try native fullscreen on the container first
         const target: any = container || iframe
@@ -410,11 +445,18 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
       const onClick = (e: Event) => {
         if (!isFullscreen()) return
         if (controlsEl && (e.target === controlsEl || controlsEl.contains(e.target as Node))) return
+        // A finger tap fires touchstart (which already showed the controls)
+        // and then click - don't let that same tap hide them again.
+        if (Date.now() - touchShownAtRef.current < 600) return
         if (controlsVisibleRef.current) hideControls()
         else showControls()
       }
       const onTouch = () => {
-        if (isFullscreen()) showControls()
+        if (!isFullscreen()) return
+        // tapping while they're showing hides them (handled by the click)
+        if (controlsVisibleRef.current) return
+        touchShownAtRef.current = Date.now()
+        showControls()
       }
       frame.addEventListener('click', onClick)
       frame.addEventListener('touchstart', onTouch, { passive: true })
@@ -511,13 +553,22 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
       if (playerState !== 1) return
 
       const isAlreadyFullscreen = document.fullscreenElement || container.classList.contains('pseudo-fullscreen')
-      if (!isAlreadyFullscreen) {
-        container.classList.add('pseudo-fullscreen')
-        document.body.classList.add('pseudo-fullscreen')
-        autoFullscreenRef.current = true
-        updateButtonStates()
-      }
+      if (!isAlreadyFullscreen) enterPseudoFullscreen(true)
     }
+
+    // Still in pseudo-fullscreen after a rotation (entered with the button, or
+    // entered in one orientation and rotated): rebuild the overlay's touch
+    // targets once the new size has settled (iOS reports it late).
+    let settleTimer: number | null = null
+    const onViewportChange = () => {
+      if (settleTimer) window.clearTimeout(settleTimer)
+      settleTimer = window.setTimeout(() => {
+        settleTimer = null
+        refreshOverlayLayers()
+      }, 350)
+    }
+    window.addEventListener('resize', onViewportChange)
+    viewportHandlerRef.current = onViewportChange
 
     // The media query fires on rotation everywhere `orientationchange` does;
     // listening to both ran the handler twice per rotation.
@@ -625,6 +676,13 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
         orientationMediaRef.current?.removeEventListener('change', orientationHandlerRef.current)
         orientationHandlerRef.current = null
       }
+      if (viewportHandlerRef.current) {
+        window.removeEventListener('resize', viewportHandlerRef.current)
+        viewportHandlerRef.current = null
+      }
+      // never leave the page locked
+      document.body.classList.remove('pseudo-fullscreen')
+      document.body.style.top = ''
       controlsAttachedRef.current = false
     }
   }, [])
