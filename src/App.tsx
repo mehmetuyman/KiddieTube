@@ -3,7 +3,7 @@ import VideoGrid from './components/VideoGrid'
 import YouTubeWrapper from './components/YouTubeWrapper'
 import InstallPrompt from './components/InstallPrompt'
 import ParentPanel, { requestParentAccess } from './components/ParentPanel'
-import { Video, loadVideos, LoadSource, sortNewestFirst } from './lib/videoStore'
+import { Video, loadVideos, LoadSource, sortNewestFirst, visibleVideos } from './lib/videoStore'
 
 // Category emoji mapping
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -37,15 +37,16 @@ export default function App() {
   const applyList = (loaded: Video[]) => {
     // newest additions on top - shared by the grid and the parent panel
     const list = sortNewestFirst(loaded)
+    const shown = visibleVideos(list)
     setVideos(list)
-    if (!activeVideoIdRef.current || !list.some(v => v.id === activeVideoIdRef.current)) {
-      // the current video went away (e.g. deleted in the parent panel): cue the
-      // replacement instead of auto-playing it behind the panel
+    if (!activeVideoIdRef.current || !shown.some(v => v.id === activeVideoIdRef.current)) {
+      // the current video went away (deleted or hidden in the parent panel):
+      // cue the replacement instead of auto-playing it behind the panel
       setShouldAutoPlay(false)
-      setActiveVideoId(list[0]?.id ?? null)
+      setActiveVideoId(shown[0]?.id ?? null)
     }
-    // a category can disappear when its last video is removed
-    setActiveCategory(cat => (cat === 'All' || list.some(v => v.category === cat) ? cat : 'All'))
+    // a category can disappear when its last visible video is removed/hidden
+    setActiveCategory(cat => (cat === 'All' || shown.some(v => v.category === cat) ? cat : 'All'))
   }
 
   useEffect(() => {
@@ -68,9 +69,12 @@ export default function App() {
     return source
   }
 
-  const categories = ['All', ...Array.from(new Set(videos.map((v: Video) => v.category)))]
-  const filtered = activeCategory === 'All' ? videos : videos.filter((v: Video) => v.category === activeCategory)
-  const activeVideo = videos.find(v => v.id === activeVideoId) ?? null
+  // `videos` is the full list (the parent panel manages hidden ones too);
+  // everything on the kids' page uses only the visible ones
+  const shownVideos = visibleVideos(videos)
+  const categories = ['All', ...Array.from(new Set(shownVideos.map((v: Video) => v.category)))]
+  const filtered = activeCategory === 'All' ? shownVideos : shownVideos.filter((v: Video) => v.category === activeCategory)
+  const activeVideo = shownVideos.find(v => v.id === activeVideoId) ?? null
 
   const getCategoryLabel = (cat: string) => {
     const emoji = CATEGORY_EMOJIS[cat] || '📺'
@@ -152,7 +156,7 @@ export default function App() {
                 className={`category-pill ${cat === activeCategory ? 'active' : ''}`}
                 onClick={() => {
                   setActiveCategory(cat)
-                  const filteredForCat = cat === 'All' ? videos : videos.filter((v: Video) => v.category === cat)
+                  const filteredForCat = cat === 'All' ? shownVideos : shownVideos.filter((v: Video) => v.category === cat)
                   setActiveVideoId(filteredForCat.length ? filteredForCat[0].id : null)
                   setShouldAutoPlay(false) // Don't auto-play on category change
                 }}

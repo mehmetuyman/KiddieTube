@@ -67,6 +67,7 @@ export default function ParentPanel({
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
+  const [show, setShow] = useState<'all' | 'visible' | 'hidden'>('all')
 
   const categories = useMemo(
     () => Array.from(new Set(videos.map((v) => v.category))).sort((a, b) => a.localeCompare(b)),
@@ -91,6 +92,7 @@ export default function ParentPanel({
       setNotice(null)
       setTab('videos')
       setFilter('')
+      setShow('all')
     }
   }, [open])
 
@@ -201,7 +203,9 @@ export default function ParentPanel({
     const idChanged = form.mode === 'add' || form.original?.id !== id
     const duplicate = idChanged ? videos.find((v) => v.id === id) : undefined
     if (duplicate) {
-      setError(`That video is already in the list ("${duplicate.title}").`)
+      setError(
+        `That video is already in the list ("${duplicate.title}")${duplicate.hidden ? ' — it is hidden; unhide it instead.' : '.'}`,
+      )
       return
     }
 
@@ -211,6 +215,8 @@ export default function ParentPanel({
       category,
       channel: form.channel.trim() || undefined,
       addedAt: form.original?.addedAt ?? new Date().toISOString(),
+      // keep a hidden video hidden when its link is changed (delete + add)
+      ...(form.original?.hidden ? { hidden: true } : {}),
     }
 
     let op: Op | Op[]
@@ -226,6 +232,11 @@ export default function ParentPanel({
 
     const ok = await runOp(op, form.mode === 'add' ? 'Added' : 'Saved')
     if (ok) setForm(null)
+  }
+
+  async function toggleHidden(v: Video) {
+    const hide = !v.hidden
+    await runOp({ type: 'setHidden', id: v.id, hidden: hide }, hide ? 'Hidden from the kids’ page' : 'Shown again')
   }
 
   async function deleteVideo(v: Video) {
@@ -345,13 +356,13 @@ export default function ParentPanel({
 
   /* ---------------------------------------------------------------- */
 
-  const filtered = filter.trim()
-    ? videos.filter(
-        (v) =>
-          v.title.toLowerCase().includes(filter.toLowerCase()) ||
-          v.category.toLowerCase().includes(filter.toLowerCase()),
-      )
-    : videos
+  const q = filter.trim().toLowerCase()
+  const hiddenCount = videos.filter((v) => v.hidden).length
+  const filtered = videos.filter(
+    (v) =>
+      (show === 'all' || (show === 'hidden') === !!v.hidden) &&
+      (!q || v.title.toLowerCase().includes(q) || v.category.toLowerCase().includes(q)),
+  )
 
   const connected = isGistConfigured()
 
@@ -398,17 +409,45 @@ export default function ParentPanel({
                 </button>
               </div>
 
+              <div className="pp-seg" role="group" aria-label="Show">
+                {(['all', 'visible', 'hidden'] as const).map((k) => (
+                  <button
+                    key={k}
+                    className={`pp-seg-btn ${show === k ? 'active' : ''}`}
+                    onClick={() => setShow(k)}
+                    aria-pressed={show === k}
+                  >
+                    {k === 'all'
+                      ? `All (${videos.length})`
+                      : k === 'visible'
+                        ? `Visible (${videos.length - hiddenCount})`
+                        : `Hidden (${hiddenCount})`}
+                  </button>
+                ))}
+              </div>
+
               <ul className="pp-list">
                 {filtered.map((v) => (
-                  <li className="pp-row" key={v.id}>
+                  <li className={`pp-row ${v.hidden ? 'is-hidden' : ''}`} key={v.id}>
                     <img className="pp-thumb" src={thumbUrl(v.id)} alt="" loading="lazy" />
                     <div className="pp-row-main">
                       <div className="pp-row-title">{v.title}</div>
-                      <div className="pp-row-cat">{v.category}</div>
+                      <div className="pp-row-cat">
+                        {v.hidden && <span className="pp-tag">Hidden</span>}
+                        {v.category}
+                      </div>
                     </div>
                     <div className="pp-row-actions">
                       <button className="pp-btn pp-btn-ghost" onClick={() => openEditForm(v)} disabled={busy}>
                         Edit
+                      </button>
+                      <button
+                        className="pp-btn pp-btn-ghost"
+                        onClick={() => toggleHidden(v)}
+                        disabled={busy}
+                        title={v.hidden ? 'Show on the kids’ page again' : 'Hide from the kids’ page (keeps it in the list)'}
+                      >
+                        {v.hidden ? 'Unhide' : 'Hide'}
                       </button>
                       <button className="pp-btn pp-btn-danger" onClick={() => deleteVideo(v)} disabled={busy}>
                         Delete

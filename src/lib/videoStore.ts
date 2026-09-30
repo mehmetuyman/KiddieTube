@@ -15,6 +15,8 @@ export type Video = {
   category: string
   channel?: string
   addedAt?: string
+  /** Hidden from the kids' page but kept in the list (parent panel only). */
+  hidden?: boolean
 }
 
 export type VideoDoc = {
@@ -174,15 +176,28 @@ function isVideo(v: any): v is Video {
   )
 }
 
+function normalizeVideos(list: any[]): Video[] {
+  return list.filter(isVideo).map((v) => {
+    // only an explicit `true` hides a video; drop anything else
+    const { hidden, ...rest } = v
+    return hidden === true ? { ...rest, hidden: true } : rest
+  })
+}
+
 function normalizeDoc(raw: any): VideoDoc {
   if (Array.isArray(raw)) {
-    return { version: DOC_VERSION, updatedAt: '', videos: raw.filter(isVideo) }
+    return { version: DOC_VERSION, updatedAt: '', videos: normalizeVideos(raw) }
   }
   return {
     version: typeof raw?.version === 'number' ? raw.version : DOC_VERSION,
     updatedAt: typeof raw?.updatedAt === 'string' ? raw.updatedAt : '',
-    videos: Array.isArray(raw?.videos) ? raw.videos.filter(isVideo) : [],
+    videos: Array.isArray(raw?.videos) ? normalizeVideos(raw.videos) : [],
   }
+}
+
+/** Videos the kids' page shows. */
+export function visibleVideos(list: Video[]): Video[] {
+  return list.filter((v) => !v.hidden)
 }
 
 function addedTime(v: Video): number {
@@ -365,6 +380,7 @@ export type Op =
   | { type: 'add'; video: Video }
   | { type: 'update'; video: Video }
   | { type: 'delete'; id: string }
+  | { type: 'setHidden'; id: string; hidden: boolean }
   | { type: 'replace'; videos: Video[] }
 
 export function applyOps(list: Video[], ops: Op | Op[]): Video[] {
@@ -382,6 +398,13 @@ export function applyOp(list: Video[], op: Op): Video[] {
       return list.map((v) => (v.id === op.video.id ? { ...v, ...op.video } : v))
     case 'delete':
       return list.filter((v) => v.id !== op.id)
+    case 'setHidden':
+      // touches only the flag, so a concurrent title edit elsewhere survives
+      return list.map((v) => {
+        if (v.id !== op.id) return v
+        const { hidden: _drop, ...rest } = v
+        return op.hidden ? { ...rest, hidden: true } : rest
+      })
     case 'replace':
       return op.videos
   }

@@ -953,6 +953,52 @@ body.pseudo-fullscreen .app-header {
   font-size: 0.78rem;
 }
 
+.pp-row.is-hidden .pp-thumb,
+.pp-row.is-hidden .pp-row-title {
+  opacity: 0.45;
+}
+
+.pp-row.is-hidden .pp-thumb {
+  filter: grayscale(1);
+}
+
+.pp-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: #fff3cd;
+  color: #8a6d00;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.pp-seg {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 3px;
+  background: #eef2f7;
+  border-radius: 10px;
+}
+
+.pp-seg-btn {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: transparent;
+  color: #35506b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pp-seg-btn.active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
 .pp-empty {
   padding: 24px 0;
   text-align: center;
