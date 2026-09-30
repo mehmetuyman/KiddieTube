@@ -4,6 +4,7 @@ import YouTubeWrapper from './components/YouTubeWrapper'
 import InstallPrompt from './components/InstallPrompt'
 import ParentPanel, { requestParentAccess } from './components/ParentPanel'
 import { Video, loadVideos, LoadSource, sortNewestFirst, visibleVideos } from './lib/videoStore'
+import { useDragScroll } from './lib/useDragScroll'
 
 // Category emoji mapping
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -32,6 +33,9 @@ export default function App() {
   const lpFired = useRef(false)
   const parentParamHandled = useRef(false)
   const activeVideoIdRef = useRef<string | null>(null)
+  // category row: wheel + click-drag scrolling for mouse users (desktop / installed app)
+  const pillsRef = useRef<HTMLDivElement>(null)
+  useDragScroll(pillsRef)
   activeVideoIdRef.current = activeVideoId
 
   const applyList = (loaded: Video[]) => {
@@ -146,7 +150,7 @@ export default function App() {
       </header>
 
       {/* Horizontal scrolling category pills */}
-      <div className="category-pills-container">
+      <div className="category-pills-container" ref={pillsRef}>
         <div className="category-pills">
           {categories.map(cat => {
             const { emoji, shortName } = getCategoryLabel(cat)

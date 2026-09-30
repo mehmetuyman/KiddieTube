@@ -99,6 +99,18 @@ body {
   display: none;
 }
 
+/* mouse users can click-drag the row (see useDragScroll) */
+@media (hover: hover) and (pointer: fine) {
+  .category-pills-container {
+    cursor: grab;
+  }
+  .category-pills-container.is-dragging,
+  .category-pills-container.is-dragging .category-pill {
+    cursor: grabbing;
+    user-select: none;
+  }
+}
+
 .category-pills {
   display: flex;
   gap: 12px;
