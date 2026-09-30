@@ -16,14 +16,16 @@ import {
   hasPin,
   setPin,
   verifyPin,
+  LoadSource,
 } from '../lib/videoStore'
+import { THEMES, DEFAULT_THEME, ThemeId, getTheme, setTheme } from '../lib/theme'
 
 type Props = {
   open: boolean
   onClose: () => void
   videos: Video[]
   onVideosChange: (videos: Video[]) => void
-  onRefresh: () => Promise<void> | void
+  onRefresh: () => Promise<LoadSource>
 }
 
 const NEW_CATEGORY = '__new__'
@@ -61,11 +63,13 @@ export default function ParentPanel({
   onVideosChange,
   onRefresh,
 }: Props) {
-  const [tab, setTab] = useState<'videos' | 'sync'>('videos')
+  const [tab, setTab] = useState<'videos' | 'sync' | 'theme'>('videos')
+  const [themeId, setThemeId] = useState<ThemeId>(() => getTheme())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
+  const [show, setShow] = useState<'all' | 'visible' | 'hidden'>('all')
 
   const categories = useMemo(
     () => Array.from(new Set(videos.map((v) => v.category))).sort((a, b) => a.localeCompare(b)),
@@ -90,6 +94,7 @@ export default function ParentPanel({
       setNotice(null)
       setTab('videos')
       setFilter('')
+      setShow('all')
     }
   }, [open])
 
@@ -109,7 +114,7 @@ export default function ParentPanel({
 
   /* ---------------------------------------------------------------- */
 
-  async function runOp(op: Op, successMsg: string) {
+  async function runOp(op: Op | Op[], successMsg: string) {
     setBusy(true)
     setError(null)
     setNotice(null)
@@ -153,20 +158,23 @@ export default function ParentPanel({
   async function autofillFromUrl(raw: string) {
     const id = parseYouTubeId(raw)
     setForm((f) => (f ? { ...f, url: raw, videoId: id ?? '' } : f))
+    if (id && id === lastMetaIdRef.current) return // same video - already fetched
+    // Any change of id (including to "no id") invalidates an in-flight lookup,
+    // so a slow response can't fill in the title of a video no longer entered.
+    const reqId = ++metaReqRef.current
     if (!id) {
       lastMetaIdRef.current = ''
+      setFetchingMeta(false)
       return
     }
-    if (id === lastMetaIdRef.current) return // same video - already fetched
     lastMetaIdRef.current = id
-    const reqId = ++metaReqRef.current
     setFetchingMeta(true)
     const meta = await fetchYouTubeMeta(id)
     if (reqId !== metaReqRef.current) return
     setFetchingMeta(false)
     if (!meta) return
     setForm((f) => {
-      if (!f) return f
+      if (!f || f.videoId !== id) return f
       return {
         ...f,
         channel: meta.channel || f.channel,
@@ -194,9 +202,12 @@ export default function ParentPanel({
       return
     }
 
-    const duplicate = videos.find((v) => v.id === id)
-    if (form.mode === 'add' && duplicate) {
-      setError(`That video is already in the list ("${duplicate.title}").`)
+    const idChanged = form.mode === 'add' || form.original?.id !== id
+    const duplicate = idChanged ? videos.find((v) => v.id === id) : undefined
+    if (duplicate) {
+      setError(
+        `That video is already in the list ("${duplicate.title}")${duplicate.hidden ? ' — it is hidden; unhide it instead.' : '.'}`,
+      )
       return
     }
 
@@ -206,19 +217,28 @@ export default function ParentPanel({
       category,
       channel: form.channel.trim() || undefined,
       addedAt: form.original?.addedAt ?? new Date().toISOString(),
+      // keep a hidden video hidden when its link is changed (delete + add)
+      ...(form.original?.hidden ? { hidden: true } : {}),
     }
 
-    let op: Op
+    let op: Op | Op[]
     if (form.mode === 'edit' && form.original && form.original.id !== id) {
-      // id changed on edit -> remove old entry, add new
-      await runOp({ type: 'delete', id: form.original.id }, 'Removed old entry')
-      op = { type: 'add', video }
+      // id changed on edit -> replace the old entry in one atomic commit
+      op = [
+        { type: 'delete', id: form.original.id },
+        { type: 'add', video },
+      ]
     } else {
       op = form.mode === 'add' ? { type: 'add', video } : { type: 'update', video }
     }
 
     const ok = await runOp(op, form.mode === 'add' ? 'Added' : 'Saved')
     if (ok) setForm(null)
+  }
+
+  async function toggleHidden(v: Video) {
+    const hide = !v.hidden
+    await runOp({ type: 'setHidden', id: v.id, hidden: hide }, hide ? 'Hidden from the kids’ page' : 'Shown again')
   }
 
   async function deleteVideo(v: Video) {
@@ -278,6 +298,21 @@ export default function ParentPanel({
     }
   }
 
+  async function refreshFromCloud() {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const source = await onRefresh()
+      if (source === 'gist') setNotice('List refreshed from the cloud.')
+      else setError("Couldn't reach the cloud list — showing this device's saved copy.")
+    } catch (err: any) {
+      setError(err?.message || String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function disconnect(removeToken: boolean) {
     if (removeToken) {
       setGistConfig(null)
@@ -323,13 +358,13 @@ export default function ParentPanel({
 
   /* ---------------------------------------------------------------- */
 
-  const filtered = filter.trim()
-    ? videos.filter(
-        (v) =>
-          v.title.toLowerCase().includes(filter.toLowerCase()) ||
-          v.category.toLowerCase().includes(filter.toLowerCase()),
-      )
-    : videos
+  const q = filter.trim().toLowerCase()
+  const hiddenCount = videos.filter((v) => v.hidden).length
+  const filtered = videos.filter(
+    (v) =>
+      (show === 'all' || (show === 'hidden') === !!v.hidden) &&
+      (!q || v.title.toLowerCase().includes(q) || v.category.toLowerCase().includes(q)),
+  )
 
   const connected = isGistConfigured()
 
@@ -356,6 +391,12 @@ export default function ParentPanel({
           >
             Sync {connected ? '✓' : ''}
           </button>
+          <button
+            className={`pp-tab ${tab === 'theme' ? 'active' : ''}`}
+            onClick={() => setTab('theme')}
+          >
+            Theme
+          </button>
         </div>
 
         <div className="pp-body">
@@ -376,17 +417,45 @@ export default function ParentPanel({
                 </button>
               </div>
 
+              <div className="pp-seg" role="group" aria-label="Show">
+                {(['all', 'visible', 'hidden'] as const).map((k) => (
+                  <button
+                    key={k}
+                    className={`pp-seg-btn ${show === k ? 'active' : ''}`}
+                    onClick={() => setShow(k)}
+                    aria-pressed={show === k}
+                  >
+                    {k === 'all'
+                      ? `All (${videos.length})`
+                      : k === 'visible'
+                        ? `Visible (${videos.length - hiddenCount})`
+                        : `Hidden (${hiddenCount})`}
+                  </button>
+                ))}
+              </div>
+
               <ul className="pp-list">
                 {filtered.map((v) => (
-                  <li className="pp-row" key={v.id}>
+                  <li className={`pp-row ${v.hidden ? 'is-hidden' : ''}`} key={v.id}>
                     <img className="pp-thumb" src={thumbUrl(v.id)} alt="" loading="lazy" />
                     <div className="pp-row-main">
                       <div className="pp-row-title">{v.title}</div>
-                      <div className="pp-row-cat">{v.category}</div>
+                      <div className="pp-row-cat">
+                        {v.hidden && <span className="pp-tag">Hidden</span>}
+                        {v.category}
+                      </div>
                     </div>
                     <div className="pp-row-actions">
                       <button className="pp-btn pp-btn-ghost" onClick={() => openEditForm(v)} disabled={busy}>
                         Edit
+                      </button>
+                      <button
+                        className="pp-btn pp-btn-ghost"
+                        onClick={() => toggleHidden(v)}
+                        disabled={busy}
+                        title={v.hidden ? 'Show on the kids’ page again' : 'Hide from the kids’ page (keeps it in the list)'}
+                      >
+                        {v.hidden ? 'Unhide' : 'Hide'}
                       </button>
                       <button className="pp-btn pp-btn-danger" onClick={() => deleteVideo(v)} disabled={busy}>
                         Delete
@@ -475,6 +544,45 @@ export default function ParentPanel({
             </div>
           )}
 
+          {tab === 'theme' && (
+            <div className="pp-themes">
+              <p className="pp-sync-status">
+                Pick how the app looks. Saved on <b>this device only</b> — other devices keep their own
+                theme.
+              </p>
+              <div className="pp-theme-grid">
+                {THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    className={`pp-theme-card ${themeId === t.id ? 'active' : ''}`}
+                    aria-pressed={themeId === t.id}
+                    onClick={() => {
+                      setTheme(t.id)
+                      setThemeId(t.id)
+                    }}
+                  >
+                    <span className="pp-theme-preview" style={{ background: t.preview.bg }} aria-hidden="true">
+                      <span className="pp-theme-preview-header" style={{ background: t.preview.header }} />
+                      <span className="pp-theme-preview-pills">
+                        <span style={{ background: t.preview.pillActive }} />
+                        <span style={{ background: t.preview.pill }} />
+                        <span style={{ background: t.preview.pill }} />
+                      </span>
+                      <span className="pp-theme-preview-play" style={{ background: t.preview.play }} />
+                    </span>
+                    <span className="pp-theme-label">
+                      <span>
+                        {t.emoji} {t.name} <small>/ {t.en}</small>
+                      </span>
+                      {t.id === DEFAULT_THEME && <span className="pp-tag">Default</span>}
+                      {themeId === t.id && <span className="pp-theme-check">✓</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {tab === 'sync' && (
             <div className="pp-sync">
               <p className="pp-sync-status">
@@ -516,7 +624,7 @@ export default function ParentPanel({
                   Create shared list
                 </button>
                 {connected && (
-                  <button className="pp-btn pp-btn-ghost" onClick={() => onRefresh()} disabled={busy}>
+                  <button className="pp-btn pp-btn-ghost" onClick={refreshFromCloud} disabled={busy}>
                     Refresh from cloud
                   </button>
                 )}

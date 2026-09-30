@@ -3,7 +3,9 @@ import VideoGrid from './components/VideoGrid'
 import YouTubeWrapper from './components/YouTubeWrapper'
 import InstallPrompt from './components/InstallPrompt'
 import ParentPanel, { requestParentAccess } from './components/ParentPanel'
-import { Video, loadVideos, LoadSource } from './lib/videoStore'
+import { Video, loadVideos, LoadSource, sortNewestFirst, visibleVideos } from './lib/videoStore'
+import { useDragScroll } from './lib/useDragScroll'
+import { useCompactOnScroll } from './lib/useCompactOnScroll'
 
 // Category emoji mapping
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -23,37 +25,60 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
+  // bumped on every explicit tap so re-tapping the current video replays it
+  const [playRequest, setPlayRequest] = useState(0)
   const [parentOpen, setParentOpen] = useState(false)
-  const [, setSource] = useState<LoadSource>('seed')
 
   // long-press detection on the logo -> opens the (hidden) parent panel
   const lpTimer = useRef<number | null>(null)
   const lpFired = useRef(false)
   const parentParamHandled = useRef(false)
+  const activeVideoIdRef = useRef<string | null>(null)
+  // category row: wheel + click-drag scrolling for mouse users (desktop / installed app)
+  const pillsRef = useRef<HTMLDivElement>(null)
+  useDragScroll(pillsRef)
 
-  const applyLoaded = (list: Video[], src: LoadSource) => {
-    setVideos(list)
-    setSource(src)
-    setActiveVideoId(prev => {
-      if (prev && list.some(v => v.id === prev)) return prev
-      return list.length ? list[0].id : null
-    })
-    if (list.length) {
-      setTimeout(() => {
-        const titleEl = document.getElementById('videoTitle')
-        const categoryEl = document.getElementById('videoCategory')
-        const current = list.find(v => v.id === (activeVideoId ?? list[0].id)) || list[0]
-        if (titleEl && titleEl.textContent === 'Select a video to begin') titleEl.textContent = current.title
-        if (categoryEl && !categoryEl.textContent) categoryEl.textContent = current.category
-      }, 100)
+  // Picking a category from the frozen row while scrolled into the grid: jump
+  // to the start of that category's videos instead of leaving the view in the
+  // middle of a list that just changed. Above the grid (player visible): stay.
+  const gridRef = useRef<HTMLElement>(null)
+  const showGridStart = () => {
+    const grid = gridRef.current
+    const bar = topRef.current
+    if (!grid || !bar) return
+    const barBottom = bar.getBoundingClientRect().bottom
+    const gridTop = grid.getBoundingClientRect().top
+    if (gridTop < barBottom) {
+      window.scrollTo({ top: window.scrollY + gridTop - barBottom, behavior: 'smooth' })
     }
+  }
+
+  // Header + category row are pinned to the top together and shrink to a
+  // compact size once the page scrolls (see useCompactOnScroll).
+  const topRef = useRef<HTMLDivElement>(null)
+  const topSpacerRef = useRef<HTMLDivElement>(null)
+  useCompactOnScroll(topRef, topSpacerRef)
+  activeVideoIdRef.current = activeVideoId
+
+  const applyList = (loaded: Video[]) => {
+    // newest additions on top - shared by the grid and the parent panel
+    const list = sortNewestFirst(loaded)
+    const shown = visibleVideos(list)
+    setVideos(list)
+    if (!activeVideoIdRef.current || !shown.some(v => v.id === activeVideoIdRef.current)) {
+      // the current video went away (deleted or hidden in the parent panel):
+      // cue the replacement instead of auto-playing it behind the panel
+      setShouldAutoPlay(false)
+      setActiveVideoId(shown[0]?.id ?? null)
+    }
+    // a category can disappear when its last visible video is removed/hidden
+    setActiveCategory(cat => (cat === 'All' || shown.some(v => v.category === cat) ? cat : 'All'))
   }
 
   useEffect(() => {
     loadVideos()
-      .then(({ doc, source }) => applyLoaded(doc.videos, source))
+      .then(({ doc }) => applyList(doc.videos))
       .catch(err => console.error('Failed to load videos', err))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -64,22 +89,18 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const reloadFromCloud = async () => {
-    try {
-      const { doc, source } = await loadVideos()
-      applyLoaded(doc.videos, source)
-    } catch (err) {
-      console.error('Refresh failed', err)
-    }
+  const reloadFromCloud = async (): Promise<LoadSource> => {
+    const { doc, source } = await loadVideos()
+    applyList(doc.videos)
+    return source
   }
 
-  const handleVideosChange = (next: Video[]) => {
-    setVideos(next)
-    setActiveVideoId(cur => (cur && next.some(v => v.id === cur) ? cur : next[0]?.id ?? null))
-  }
-
-  const categories = ['All', ...Array.from(new Set(videos.map((v: Video) => v.category)))]
-  const filtered = activeCategory === 'All' ? videos : videos.filter((v: Video) => v.category === activeCategory)
+  // `videos` is the full list (the parent panel manages hidden ones too);
+  // everything on the kids' page uses only the visible ones
+  const shownVideos = visibleVideos(videos)
+  const categories = ['All', ...Array.from(new Set(shownVideos.map((v: Video) => v.category)))]
+  const filtered = activeCategory === 'All' ? shownVideos : shownVideos.filter((v: Video) => v.category === activeCategory)
+  const activeVideo = shownVideos.find(v => v.id === activeVideoId) ?? null
 
   const getCategoryLabel = (cat: string) => {
     const emoji = CATEGORY_EMOJIS[cat] || '📺'
@@ -91,15 +112,29 @@ export default function App() {
   const handleVideoSelect = (id: string) => {
     setActiveVideoId(id)
     setShouldAutoPlay(true) // User explicitly clicked a video, auto-play it
+    setPlayRequest(n => n + 1)
     // Scroll to show full player at top
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }, 100)
   }
 
+  // A phone's own long-press gesture (~0.5s) starts selecting text/icons near
+  // the finger before our 0.7s timer fires; drop that selection.
+  function clearSelection() {
+    try {
+      window.getSelection()?.removeAllRanges()
+    } catch {
+      /* ignore */
+    }
+  }
+
   function openParent() {
+    clearSelection()
     if (!requestParentAccess()) return
     setParentOpen(true)
+    // the OS may extend the selection until the finger lifts
+    window.setTimeout(clearSelection, 50)
   }
 
   // --- long-press on the logo ---
@@ -112,6 +147,7 @@ export default function App() {
     }, 700)
   }
   const cancelLongPress = () => {
+    if (lpFired.current) clearSelection() // finger lifted after the panel opened
     if (lpTimer.current) {
       window.clearTimeout(lpTimer.current)
       lpTimer.current = null
@@ -127,50 +163,57 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Simple header with logo */}
-      <header className="app-header">
-        <div
-          className="brand-clickable"
-          onClick={handleBrandActivate}
-          onPointerDown={startLongPress}
-          onPointerUp={cancelLongPress}
-          onPointerLeave={cancelLongPress}
-          onPointerCancel={cancelLongPress}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.location.reload() }}
-          aria-label="Reload app"
-          title="Reload app"
-        >
-          <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Kiddie Tube" className="app-logo" />
-          <span className="brand-title">Kiddie Tube</span>
-        </div>
-        <span className="version-badge">v2.1.0</span>
-      </header>
+      {/* Frozen top block: header + category row (compacts while scrolled) */}
+      <div className="app-top" ref={topRef}>
+        {/* Simple header with logo */}
+        <header className="app-header">
+          <div
+            className="brand-clickable"
+            onClick={handleBrandActivate}
+            onPointerDown={startLongPress}
+            onPointerUp={cancelLongPress}
+            onPointerLeave={cancelLongPress}
+            onPointerCancel={cancelLongPress}
+            role="button"
+            tabIndex={0}
+            onContextMenu={(e) => e.preventDefault()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.location.reload() }}
+            aria-label="Reload app"
+            title="Reload app"
+          >
+            <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Kiddie Tube" className="app-logo" draggable={false} />
+            <span className="brand-title">Kiddie Tube</span>
+          </div>
+          <span className="version-badge">v{__APP_VERSION__}</span>
+        </header>
 
-      {/* Horizontal scrolling category pills */}
-      <div className="category-pills-container">
-        <div className="category-pills">
-          {categories.map(cat => {
-            const { emoji, shortName } = getCategoryLabel(cat)
-            return (
-              <button
-                key={cat}
-                className={`category-pill ${cat === activeCategory ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveCategory(cat)
-                  const filteredForCat = cat === 'All' ? videos : videos.filter((v: Video) => v.category === cat)
-                  setActiveVideoId(filteredForCat.length ? filteredForCat[0].id : null)
-                  setShouldAutoPlay(false) // Don't auto-play on category change
-                }}
-              >
-                <span className="category-emoji">{emoji}</span>
-                <span className="category-name">{shortName}</span>
-              </button>
-            )
-          })}
+        {/* Horizontal scrolling category pills */}
+        <div className="category-pills-container" ref={pillsRef}>
+          <div className="category-pills">
+            {categories.map(cat => {
+              const { emoji, shortName } = getCategoryLabel(cat)
+              return (
+                <button
+                  key={cat}
+                  className={`category-pill ${cat === activeCategory ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveCategory(cat)
+                    const filteredForCat = cat === 'All' ? shownVideos : shownVideos.filter((v: Video) => v.category === cat)
+                    setActiveVideoId(filteredForCat.length ? filteredForCat[0].id : null)
+                    setShouldAutoPlay(false) // Don't auto-play on category change
+                    showGridStart()
+                  }}
+                >
+                  <span className="category-emoji">{emoji}</span>
+                  <span className="category-name">{shortName}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
+      {/* the bar is fixed (out of the page flow); this keeps its full-size room */}
+      <div className="app-top-spacer" ref={topSpacerRef} aria-hidden="true" />
 
       {/* Video player - sticky on mobile */}
       <section className="player-section">
@@ -197,20 +240,21 @@ export default function App() {
               <span id="currentTime" className="time-display">0:00</span>
               <input type="range" id="progressBar" className="progress-slider" defaultValue={0} min={0} max={100} />
               <span id="duration" className="time-display">0:00</span>
+              <button id="btnSpeed" className="control-btn-speed" title="Playback speed" aria-label="Playback speed">1x</button>
               <button id="btnFullscreen" className="control-btn-fullscreen">⛶</button>
             </div>
           </div>
 
-          <h1 className="video-title" id="videoTitle">Select a video to begin</h1>
+          <h1 className="video-title" id="videoTitle">{activeVideo ? activeVideo.title : 'Select a video to begin'}</h1>
           <div className="video-meta">
-            <p className="video-category" id="videoCategory"></p>
+            <p className="video-category" id="videoCategory">{activeVideo?.category ?? ''}</p>
             <span className="status-badge" id="videoStatus">Idle</span>
           </div>
         </div>
       </section>
 
       {/* Video grid */}
-      <section className="video-grid-section">
+      <section className="video-grid-section" ref={gridRef}>
         <div className="grid-header">
           <span className="grid-title">{activeCategory === 'All' ? 'All Videos' : getCategoryLabel(activeCategory).shortName}</span>
           <span className="grid-count">{filtered.length} videos</span>
@@ -223,13 +267,13 @@ export default function App() {
       </section>
 
       <InstallPrompt onClose={() => {}} />
-      <YouTubeWrapper videoId={activeVideoId} videos={videos} autoPlay={shouldAutoPlay} />
+      <YouTubeWrapper videoId={activeVideoId} autoPlay={shouldAutoPlay} playRequest={playRequest} />
 
       <ParentPanel
         open={parentOpen}
         onClose={() => setParentOpen(false)}
         videos={videos}
-        onVideosChange={handleVideosChange}
+        onVideosChange={applyList}
         onRefresh={reloadFromCloud}
       />
     </div>

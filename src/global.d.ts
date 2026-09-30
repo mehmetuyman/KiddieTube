@@ -6,3 +6,7 @@ declare global {
     YT: any
   }
 }
+
+declare global {
+  const __APP_VERSION__: string
+}

@@ -11,14 +11,32 @@ const YT_PLAYER_VARS = {
   origin: window.location.origin,
 }
 
-type Video = { id: string; title: string; category: string }
-type Props = { 
-  videoId: string | null
-  videos: Video[]
-  autoPlay?: boolean
+// Speeds offered by the speed button (cycled in order), limited to what the
+// current video supports.
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5]
+const LS_SPEED = 'kiddietube-playback-rate'
+
+function readSavedSpeed(): number {
+  try {
+    const n = Number(localStorage.getItem(LS_SPEED))
+    return SPEEDS.includes(n) ? n : 1
+  } catch {
+    return 1
+  }
 }
 
-export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Props) {
+function formatSpeed(rate: number): string {
+  return `${rate}x`
+}
+
+type Props = {
+  videoId: string | null
+  autoPlay?: boolean
+  /** Incremented on every explicit tap so re-selecting the current video replays it. */
+  playRequest?: number
+}
+
+export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest = 0 }: Props) {
   const playerRef = useRef<any>(null)
   const playerReadyRef = useRef(false)
   const pendingRef = useRef<string | null>(null)
@@ -33,11 +51,21 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
   const containerMouseMoveHandlerRef = useRef<(() => void) | null>(null)
   const controlsPointerDownHandlerRef = useRef<(() => void) | null>(null)
   const controlsPointerUpHandlerRef = useRef<(() => void) | null>(null)
-  const isMutedRef = useRef<boolean>(false)
   const controlsAttachedRef = useRef(false)
   const orientationHandlerRef = useRef<(() => void) | null>(null)
   const orientationMediaRef = useRef<MediaQueryList | null>(null)
-  const orientationCheckIntervalRef = useRef<number | null>(null)
+  const progressInputHandlerRef = useRef<(() => void) | null>(null)
+  const progressChangeHandlerRef = useRef<(() => void) | null>(null)
+  const seekingRef = useRef(false)
+  const seekIdleTimerRef = useRef<number | null>(null)
+  const autoFullscreenRef = useRef(false)
+  const lockedScrollRef = useRef(0) // page scroll position while pseudo-fullscreen
+  const viewportHandlerRef = useRef<(() => void) | null>(null)
+  const touchShownAtRef = useRef(0) // when a touch last revealed the controls
+  const lastLockStateRef = useRef<boolean | null>(null)
+  // the speed the parent picked; re-applied because YouTube can reset it to 1
+  // when a new video loads
+  const speedRef = useRef<number>(readSavedSpeed())
 
   useEffect(() => {
     if (!document.getElementById('youtube-iframe-api')) {
@@ -47,29 +75,44 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
       document.head.appendChild(script)
     }
 
-    window.onYouTubeIframeAPIReady = () => {
-      // @ts-ignore
+    let cancelled = false
+    const createPlayer = () => {
+      if (cancelled || playerRef.current) return
       playerRef.current = new window.YT.Player('videoPlayer', {
         width: '100%',
         height: '100%',
         playerVars: YT_PLAYER_VARS,
         events: {
           onReady: () => {
+            if (cancelled) return
             playerReadyRef.current = true
             if (pendingRef.current) {
-              // @ts-ignore - Only cue on initial load, don't auto-play
+              // Only cue on initial load, don't auto-play
               playerRef.current.cueVideoById(pendingRef.current)
               pendingRef.current = null
             }
             attachControls()
           },
           onStateChange: (e: any) => handleStateChange(e),
+          onPlaybackRateChange: (e: any) => updateSpeedLabel(e.data),
         },
       })
     }
 
+    // The API script calls onYouTubeIframeAPIReady only once. If it has already
+    // loaded (remount, HMR), create the player straight away.
+    if (window.YT && window.YT.Player) createPlayer()
+    else window.onYouTubeIframeAPIReady = createPlayer
+
     return () => {
-      // cleanup if needed
+      cancelled = true
+      playerReadyRef.current = false
+      try {
+        playerRef.current?.destroy?.()
+      } catch {
+        /* player already gone */
+      }
+      playerRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -87,31 +130,19 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
       } else {
         playerRef.current.cueVideoById(videoId)
       }
-      updateVideoInfo(videoId)
     } else {
       pendingRef.current = videoId
     }
-  }, [videoId, videos])
-
-  function updateVideoInfo(id: string) {
-    const video = videos.find(v => v.id === id)
-    const titleEl = document.getElementById('videoTitle')
-    const categoryEl = document.getElementById('videoCategory')
-    
-    if (titleEl) {
-      titleEl.textContent = video ? video.title : 'Select a video to begin'
-    }
-    if (categoryEl) {
-      categoryEl.textContent = video ? video.category : ''
-    }
-  }
+    // Deliberately not keyed on the video list: editing titles in the parent
+    // panel must not restart the video that is playing.
+  }, [videoId, playRequest])
 
   function updateButtonStates() {
     if (!playerRef.current) return
-    
+
     const btnPlayPause = document.getElementById('btnPlayPause')
     const btnFullscreen = document.getElementById('btnFullscreen')
-    
+
     // Update play/pause button text and state
     const playerState = playerRef.current.getPlayerState?.()
     if (btnPlayPause) {
@@ -123,10 +154,10 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
         btnPlayPause.classList.remove('active')
       }
     }
-    
+
     // Update fullscreen state
     if (btnFullscreen) {
-      const isFs = document.fullscreenElement || 
+      const isFs = document.fullscreenElement ||
                    document.querySelector('.video-container.pseudo-fullscreen') ||
                    document.body.classList.contains('pseudo-fullscreen')
       if (isFs) {
@@ -134,6 +165,91 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
       } else {
         btnFullscreen.classList.remove('active')
       }
+    }
+  }
+
+  function updateSpeedLabel(rate?: number) {
+    const btn = document.getElementById('btnSpeed')
+    if (!btn) return
+    const r = typeof rate === 'number' ? rate : playerRef.current?.getPlaybackRate?.() ?? speedRef.current
+    btn.textContent = formatSpeed(r)
+    btn.classList.toggle('active', r !== 1)
+  }
+
+  function availableSpeeds(): number[] {
+    const supported: number[] = playerRef.current?.getAvailablePlaybackRates?.() ?? []
+    const usable = SPEEDS.filter((s) => supported.includes(s))
+    return usable.length ? usable : SPEEDS
+  }
+
+  // Apply the chosen speed to the current video if it differs.
+  function applySpeed() {
+    const p = playerRef.current
+    if (!p?.setPlaybackRate) return
+    if (p.getPlaybackRate?.() !== speedRef.current) p.setPlaybackRate(speedRef.current)
+    updateSpeedLabel()
+  }
+
+  // Pseudo-fullscreen = the player container covers the viewport (position:
+  // fixed) and the page underneath is locked. It's the only fullscreen iPhones
+  // get. The page is locked *at its current scroll position* (body fixed with a
+  // negative top) and put back on exit: pinning it at 0 made the page jump,
+  // lost the scroll position, and on iOS left touch targets out of step with
+  // what's drawn after a rotation.
+  function enterPseudoFullscreen(auto: boolean) {
+    const container = document.querySelector('.video-container') as HTMLElement | null
+    if (!container || container.classList.contains('pseudo-fullscreen')) return
+    const y = window.scrollY
+    lockedScrollRef.current = y
+    document.body.style.top = `-${y}px`
+    document.body.classList.add('pseudo-fullscreen')
+    container.classList.add('pseudo-fullscreen')
+    autoFullscreenRef.current = auto
+    updateButtonStates()
+  }
+
+  function exitPseudoFullscreen() {
+    autoFullscreenRef.current = false
+    const wasPseudo = document.body.classList.contains('pseudo-fullscreen')
+    document.body.classList.remove('pseudo-fullscreen')
+    document.body.style.top = ''
+    document.querySelector('.video-container.pseudo-fullscreen')?.classList.remove('pseudo-fullscreen')
+    // instant: Bootstrap turns on smooth scrolling for the whole page, which
+    // would visibly scroll down from the top
+    if (wasPseudo) window.scrollTo({ top: lockedScrollRef.current, behavior: 'instant' as ScrollBehavior })
+    // overlay controls are only shown in fullscreen
+    document.querySelector('.custom-controls')?.classList.remove('visible')
+    document.getElementById('btnExitPseudoFs')?.classList.remove('visible')
+    controlsVisibleRef.current = false
+    updateButtonStates()
+  }
+
+  // iOS WebKit keeps stale touch targets for fixed-position layers after a
+  // rotation (drawn in the new place, tappable in the old one - rotating back
+  // "fixes" it). Rebuilding the overlay layers once the rotation has settled
+  // makes it recompute them.
+  function refreshOverlayLayers() {
+    if (!document.body.classList.contains('pseudo-fullscreen')) return
+    const els = document.querySelectorAll<HTMLElement>(
+      '.video-container .custom-controls, #btnExitPseudoFs, .video-container .iframe-guard-full',
+    )
+    els.forEach((el) => (el.style.display = 'none'))
+    void document.body.offsetHeight
+    els.forEach((el) => (el.style.display = ''))
+  }
+
+  // Lock to portrait when not playing, allow rotation when playing. Driven by
+  // player state changes (not polled) and only acts when the wanted lock changes.
+  function updateOrientationLock(isPlaying: boolean) {
+    if (lastLockStateRef.current === isPlaying) return
+    lastLockStateRef.current = isPlaying
+    const orientation: any = screen.orientation
+    if (!orientation || typeof orientation.lock !== 'function') return
+    try {
+      if (isPlaying) orientation.unlock()
+      else orientation.lock('portrait').catch(() => { /* unsupported outside installed PWA / fullscreen */ })
+    } catch {
+      /* ignore */
     }
   }
 
@@ -170,6 +286,26 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
       }
     }
 
+    // Playback speed: cycle through the speeds this video supports
+    const btnSpeed = document.getElementById('btnSpeed')
+    if (btnSpeed) {
+      btnSpeed.onclick = () => {
+        if (!playerRef.current) return
+        const speeds = availableSpeeds()
+        const i = speeds.indexOf(speedRef.current)
+        const next = speeds[(i + 1) % speeds.length] ?? 1
+        speedRef.current = next
+        try {
+          localStorage.setItem(LS_SPEED, String(next))
+        } catch {
+          /* ignore */
+        }
+        playerRef.current.setPlaybackRate(next)
+        updateSpeedLabel(next)
+      }
+      updateSpeedLabel(speedRef.current)
+    }
+
     // Skip backward 10 seconds
     if (btnSkipBack) {
       btnSkipBack.onclick = () => {
@@ -188,24 +324,16 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
         playerRef.current.seekTo(Math.min(duration, currentTime + 10), true)
       }
     }
-    
+
     // Fullscreen and exit fullscreen buttons
     if (btnFullscreen) {
       const escHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          // exit pseudo-fullscreen if active
-          document.body.classList.remove('pseudo-fullscreen')
-          const c = document.querySelector('.video-container.pseudo-fullscreen')
-          c?.classList.remove('pseudo-fullscreen')
-          updateButtonStates()
-        }
+        if (e.key === 'Escape') exitPseudoFullscreen()
       }
       const fsChangeHandler = () => {
         // if native fullscreen ended, ensure pseudo class is removed
         if (!document.fullscreenElement) {
-          document.body.classList.remove('pseudo-fullscreen')
-          const c = document.querySelector('.video-container.pseudo-fullscreen')
-          c?.classList.remove('pseudo-fullscreen')
+          exitPseudoFullscreen()
           // Hide overlay controls when exiting fullscreen
           hideControls()
         }
@@ -218,6 +346,15 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
 
       btnFullscreen.onclick = () => {
         const container = document.querySelector('.video-container') as HTMLElement | null
+        if (!playerRef.current) return
+
+        // Already in pseudo-fullscreen (e.g. entered on landscape rotation):
+        // the button toggles it off rather than stacking native fullscreen on top.
+        if (container?.classList.contains('pseudo-fullscreen')) {
+          exitPseudoFullscreen()
+          return
+        }
+
         const iframe = playerRef.current.getIframe()
         // ensure iframe allows fullscreen and autoplay where needed
         if (iframe && !iframe.hasAttribute('allowfullscreen')) {
@@ -235,43 +372,35 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
           return
         }
 
-        // Try native fullscreen on the container first
-        const target = container || iframe
-        const requestFs = (el: any) => {
-          if (!el) return false
-          if (el.requestFullscreen) { el.requestFullscreen(); return true }
-          if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); return true }
-          if (el.msRequestFullscreen) { el.msRequestFullscreen(); return true }
-          return false
-        }
+        // fallback: pseudo-fullscreen (cover viewport with fixed positioned container)
+        const enterPseudo = () => enterPseudoFullscreen(false)
 
-        const started = requestFs(target)
-        if (!started) {
-          // fallback: pseudo-fullscreen (cover viewport with fixed positioned container)
-          if (container) {
-            const isActive = container.classList.contains('pseudo-fullscreen')
-            if (isActive) {
-              document.body.classList.remove('pseudo-fullscreen')
-              container.classList.remove('pseudo-fullscreen')
-            } else {
-              document.body.classList.add('pseudo-fullscreen')
-              container.classList.add('pseudo-fullscreen')
-            }
-            updateButtonStates()
-          }
+        // Try native fullscreen on the container first
+        const target: any = container || iframe
+        const request =
+          target?.requestFullscreen || target?.webkitRequestFullscreen || target?.msRequestFullscreen
+        if (!request) {
+          enterPseudo()
+          return
+        }
+        try {
+          const result = request.call(target)
+          // requestFullscreen() returns a promise that rejects when the browser
+          // refuses (permissions policy, no user gesture...). Fall back then too.
+          if (result && typeof result.catch === 'function') result.catch(enterPseudo)
+        } catch {
+          enterPseudo()
         }
       }
     }
 
-    // Exit pseudo-fullscreen button (touch friendly). Wired at attach time -
-    // not inside btnFullscreen.onclick - so it also works when pseudo-fullscreen
+    // Exit fullscreen button (touch friendly). Wired at attach time - not
+    // inside btnFullscreen.onclick - so it also works when pseudo-fullscreen
     // was entered automatically on landscape rotation.
     if (btnExitPseudoFs) {
       btnExitPseudoFs.onclick = () => {
-        document.body.classList.remove('pseudo-fullscreen')
-        const c = document.querySelector('.video-container.pseudo-fullscreen')
-        c?.classList.remove('pseudo-fullscreen')
-        updateButtonStates()
+        if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen()
+        exitPseudoFullscreen()
       }
     }
 
@@ -316,28 +445,29 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
       const onClick = (e: Event) => {
         if (!isFullscreen()) return
         if (controlsEl && (e.target === controlsEl || controlsEl.contains(e.target as Node))) return
+        // A finger tap fires touchstart (which already showed the controls)
+        // and then click - don't let that same tap hide them again.
+        if (Date.now() - touchShownAtRef.current < 600) return
         if (controlsVisibleRef.current) hideControls()
         else showControls()
       }
       const onTouch = () => {
-        if (isFullscreen()) showControls()
+        if (!isFullscreen()) return
+        // tapping while they're showing hides them (handled by the click)
+        if (controlsVisibleRef.current) return
+        touchShownAtRef.current = Date.now()
+        showControls()
       }
       frame.addEventListener('click', onClick)
-      frame.addEventListener('touchstart', onTouch)
+      frame.addEventListener('touchstart', onTouch, { passive: true })
       frameClickHandlerRef.current = onClick
       frameTouchHandlerRef.current = onTouch
     }
 
     // mouse activity should reveal controls briefly in fullscreen (desktop)
     if (container) {
-      let mouseMoveTimer: number | null = null
       const onMouseMove = () => {
-        if (!isFullscreen()) return
-        showControls()
-        if (mouseMoveTimer) window.clearTimeout(mouseMoveTimer)
-        mouseMoveTimer = window.setTimeout(() => {
-          mouseMoveTimer = null
-        }, 200)
+        if (isFullscreen()) showControls()
       }
       container.addEventListener('mousemove', onMouseMove)
       containerMouseMoveHandlerRef.current = onMouseMove
@@ -357,8 +487,6 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
         controlsPointerDownHandlerRef.current = onPointerDown
         controlsPointerUpHandlerRef.current = onPointerUp
       }
-
-      // cleanup attachments when leaving attachControls scope is handled by top-level cleanup
     }
 
     progressIntervalRef.current = window.setInterval(() => {
@@ -367,81 +495,89 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
         const current = playerRef.current.getCurrentTime()
 
         if (!isNaN(duration) && duration > 0) {
-          if (progressBar) {
+          // don't yank the thumb out from under a finger that is dragging it
+          if (progressBar && !seekingRef.current) {
             progressBar.max = String(duration)
             progressBar.value = String(current)
             const percent = (current / duration) * 100
-            progressBar.style.background = `linear-gradient(to right, red 0%, red ${percent}%, #555 ${percent}%, #555 100%)`
+            // colours come from the active theme (see --kt-progress-* in styles-v2.css)
+            progressBar.style.background = `linear-gradient(to right, var(--kt-progress-fill) 0%, var(--kt-progress-fill) ${percent}%, var(--kt-progress-rest) ${percent}%, var(--kt-progress-rest) 100%)`
           }
 
           if (currentTimeEl) currentTimeEl.textContent = formatTime(current)
           if (durationEl) durationEl.textContent = formatTime(duration)
         }
       }
-  }, 1000)
+    }, 1000)
 
     if (progressBar) {
-      progressBar.addEventListener('input', () => {
+      // While dragging only preview (allowSeekAhead=false); commit the real
+      // seek once on release instead of a network request per pixel.
+      const onChange = () => {
+        if (seekIdleTimerRef.current) window.clearTimeout(seekIdleTimerRef.current)
+        seekIdleTimerRef.current = null
+        seekingRef.current = false
         playerRef.current?.seekTo(Number(progressBar.value), true)
-      })
+      }
+      const onInput = () => {
+        seekingRef.current = true
+        playerRef.current?.seekTo(Number(progressBar.value), false)
+        // safety net: if `change` never arrives, commit after a pause in input
+        // so the bar can't stay frozen
+        if (seekIdleTimerRef.current) window.clearTimeout(seekIdleTimerRef.current)
+        seekIdleTimerRef.current = window.setTimeout(onChange, 1500)
+      }
+      progressBar.addEventListener('input', onInput)
+      progressBar.addEventListener('change', onChange)
+      progressInputHandlerRef.current = onInput
+      progressChangeHandlerRef.current = onChange
     }
 
     // Initialize button states
     setTimeout(() => updateButtonStates(), 500)
 
-    // Lock to portrait when not playing, allow rotation when playing
-    const updateOrientationLock = () => {
-      const playerState = playerRef.current?.getPlayerState?.()
-      const isPlaying = playerState === 1
-      
-      // Try to lock/unlock screen orientation
-      // @ts-ignore - lock/unlock may not be in all TS definitions
-      if (screen.orientation && typeof screen.orientation.lock === 'function') {
-        if (isPlaying) {
-          // Allow any orientation when playing
-          // @ts-ignore
-          screen.orientation.unlock()
-        } else {
-          // Lock to portrait when not playing
-          // @ts-ignore
-          screen.orientation.lock('portrait').catch(() => {
-            // Orientation lock may fail in some browsers, that's ok
-          })
-        }
-      }
-    }
-
-    // Auto-enter fullscreen on landscape orientation
+    // Landscape while playing -> pseudo-fullscreen; back to portrait -> leave
+    // it again, but only if it was entered automatically.
     const handleOrientationChange = () => {
       const container = document.querySelector('.video-container') as HTMLElement | null
       if (!container) return
-      
+
+      const isLandscape = window.matchMedia('(orientation: landscape)').matches
+      if (!isLandscape) {
+        if (autoFullscreenRef.current) exitPseudoFullscreen()
+        return
+      }
+
       // Only trigger if video is playing
       const playerState = playerRef.current?.getPlayerState?.()
-      if (playerState !== 1) return // Not playing
-      
-      const isLandscape = window.matchMedia('(orientation: landscape)').matches
-      const isAlreadyFullscreen = document.fullscreenElement || container.classList.contains('pseudo-fullscreen')
-      
-      if (isLandscape && !isAlreadyFullscreen) {
-        // Enter fullscreen
-        container.classList.add('pseudo-fullscreen')
-        document.body.classList.add('pseudo-fullscreen')
-        updateButtonStates()
-      }
-    }
-    
-    const orientationMedia = window.matchMedia('(orientation: landscape)')
-    window.addEventListener('orientationchange', handleOrientationChange)
-    orientationMedia.addEventListener('change', handleOrientationChange)
+      if (playerState !== 1) return
 
-    // Update orientation lock whenever player state might change
-    const orientationCheckInterval = window.setInterval(updateOrientationLock, 1000)
+      const isAlreadyFullscreen = document.fullscreenElement || container.classList.contains('pseudo-fullscreen')
+      if (!isAlreadyFullscreen) enterPseudoFullscreen(true)
+    }
+
+    // Still in pseudo-fullscreen after a rotation (entered with the button, or
+    // entered in one orientation and rotated): rebuild the overlay's touch
+    // targets once the new size has settled (iOS reports it late).
+    let settleTimer: number | null = null
+    const onViewportChange = () => {
+      if (settleTimer) window.clearTimeout(settleTimer)
+      settleTimer = window.setTimeout(() => {
+        settleTimer = null
+        refreshOverlayLayers()
+      }, 350)
+    }
+    window.addEventListener('resize', onViewportChange)
+    viewportHandlerRef.current = onViewportChange
+
+    // The media query fires on rotation everywhere `orientationchange` does;
+    // listening to both ran the handler twice per rotation.
+    const orientationMedia = window.matchMedia('(orientation: landscape)')
+    orientationMedia.addEventListener('change', handleOrientationChange)
 
     // Track for cleanup on unmount
     orientationHandlerRef.current = handleOrientationChange
     orientationMediaRef.current = orientationMedia
-    orientationCheckIntervalRef.current = orientationCheckInterval
 
     // end attachControls
 
@@ -456,13 +592,13 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
     const pauseShield = document.querySelector('.pause-shield')
     const statusEl = document.getElementById('videoStatus')
     const btnPlayPause = document.getElementById('btnPlayPause')
-    
+
     // YT.PlayerState: -1 = unstarted, 0 = ended, 1 = playing, 2 = paused, 3 = buffering, 5 = cued
     if (event.data === 2) {
       pauseShield?.classList.add('visible')
       if (statusEl) {
         statusEl.textContent = 'Paused'
-        statusEl.className = 'badge text-bg-warning'
+        statusEl.className = 'status-badge badge text-bg-warning'
       }
       if (btnPlayPause) btnPlayPause.textContent = '▶'
     } else {
@@ -471,26 +607,31 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
       if (statusEl) {
         if (event.data === 1) {
           statusEl.textContent = 'Playing'
-          statusEl.className = 'badge text-bg-success'
+          statusEl.className = 'status-badge badge text-bg-success'
         } else if (event.data === 0) {
           statusEl.textContent = 'Ended'
-          statusEl.className = 'badge text-bg-secondary'
+          statusEl.className = 'status-badge badge text-bg-secondary'
           if (btnPlayPause) btnPlayPause.textContent = '▶'
         } else if (event.data === 3) {
           statusEl.textContent = 'Buffering'
-          statusEl.className = 'badge text-bg-info'
+          statusEl.className = 'status-badge badge text-bg-info'
         } else if (event.data === 5) {
           statusEl.textContent = 'Ready'
-          statusEl.className = 'badge text-bg-primary'
+          statusEl.className = 'status-badge badge text-bg-primary'
         } else {
           statusEl.textContent = 'Idle'
-          statusEl.className = 'badge text-bg-secondary'
+          statusEl.className = 'status-badge badge text-bg-secondary'
         }
       }
     }
-    
+
+    // a newly loaded video may start at 1x - put the chosen speed back
+    if (event.data === 1 || event.data === 5) applySpeed()
+
     // Update button states when player state changes
     updateButtonStates()
+    // buffering (3) keeps the current lock so a brief stall doesn't flip it
+    if (event.data !== 3) updateOrientationLock(event.data === 1)
   }
 
   // cleanup handlers when component unmounts
@@ -502,37 +643,46 @@ export default function YouTubeWrapper({ videoId, videos, autoPlay = false }: Pr
       const frame = document.querySelector('.video-frame') as HTMLElement | null
       const container = document.querySelector('.video-container') as HTMLElement | null
       const controlsEl = document.querySelector('.custom-controls') as HTMLElement | null
+      const progressBar = document.getElementById('progressBar')
       if (frame) {
         if (frameClickHandlerRef.current) frame.removeEventListener('click', frameClickHandlerRef.current)
         if (frameTouchHandlerRef.current) frame.removeEventListener('touchstart', frameTouchHandlerRef.current)
       }
       if (container) {
         if (containerMouseMoveHandlerRef.current) container.removeEventListener('mousemove', containerMouseMoveHandlerRef.current)
-        // remove overlay class
-        container.classList.remove('controls-overlay')
       }
       if (controlsEl) {
         if (controlsPointerDownHandlerRef.current) controlsEl.removeEventListener('pointerdown', controlsPointerDownHandlerRef.current)
         if (controlsPointerUpHandlerRef.current) controlsEl.removeEventListener('pointerup', controlsPointerUpHandlerRef.current)
         controlsEl.classList.remove('visible')
       }
+      if (progressBar) {
+        if (progressInputHandlerRef.current) progressBar.removeEventListener('input', progressInputHandlerRef.current)
+        if (progressChangeHandlerRef.current) progressBar.removeEventListener('change', progressChangeHandlerRef.current)
+      }
       if (hideTimerRef.current) {
         window.clearTimeout(hideTimerRef.current)
         hideTimerRef.current = null
+      }
+      if (seekIdleTimerRef.current) {
+        window.clearTimeout(seekIdleTimerRef.current)
+        seekIdleTimerRef.current = null
       }
       if (progressIntervalRef.current) {
         window.clearInterval(progressIntervalRef.current)
         progressIntervalRef.current = null
       }
       if (orientationHandlerRef.current) {
-        window.removeEventListener('orientationchange', orientationHandlerRef.current)
         orientationMediaRef.current?.removeEventListener('change', orientationHandlerRef.current)
         orientationHandlerRef.current = null
       }
-      if (orientationCheckIntervalRef.current) {
-        window.clearInterval(orientationCheckIntervalRef.current)
-        orientationCheckIntervalRef.current = null
+      if (viewportHandlerRef.current) {
+        window.removeEventListener('resize', viewportHandlerRef.current)
+        viewportHandlerRef.current = null
       }
+      // never leave the page locked
+      document.body.classList.remove('pseudo-fullscreen')
+      document.body.style.top = ''
       controlsAttachedRef.current = false
     }
   }, [])

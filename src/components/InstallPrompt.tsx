@@ -4,6 +4,25 @@ const INSTALL_PROMPT_PREF_KEY = 'kiddietube-install-prompt';
 const PROMPT_DISMISSED_VALUE = 'dismissed';
 const PROMPT_INSTALLED_VALUE = 'installed';
 
+// localStorage can throw (blocked storage, some private modes). A throw inside
+// an effect would unmount the whole app, so treat it as "no preference".
+function readPref(): string | null {
+  try {
+    return localStorage.getItem(INSTALL_PROMPT_PREF_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writePref(value: string | null) {
+  try {
+    if (value === null) localStorage.removeItem(INSTALL_PROMPT_PREF_KEY);
+    else localStorage.setItem(INSTALL_PROMPT_PREF_KEY, value);
+  } catch {
+    /* ignore */
+  }
+}
+
 interface InstallPromptProps {
   onClose: () => void;
 }
@@ -12,10 +31,7 @@ const InstallPrompt: React.FC<InstallPromptProps> = ({ onClose }) => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(false);
 
-  const checkPromptPreference = () => {
-    const preference = localStorage.getItem(INSTALL_PROMPT_PREF_KEY);
-    return !preference; // Show prompt if no preference is stored
-  };
+  const checkPromptPreference = () => !readPref(); // Show prompt if no preference is stored
 
   useEffect(() => {
     // Only proceed if user hasn't dismissed or installed
@@ -36,7 +52,7 @@ const InstallPrompt: React.FC<InstallPromptProps> = ({ onClose }) => {
 
     // Listen for successful installs through other means
     const onAppInstalled = () => {
-      localStorage.setItem(INSTALL_PROMPT_PREF_KEY, PROMPT_INSTALLED_VALUE);
+      writePref(PROMPT_INSTALLED_VALUE);
       setIsVisible(false);
     };
     window.addEventListener('appinstalled', onAppInstalled);
@@ -50,17 +66,13 @@ const InstallPrompt: React.FC<InstallPromptProps> = ({ onClose }) => {
   const handleInstall = async () => {
     if (!deferredPrompt) return;
 
-    // Show the install prompt
-    deferredPrompt.prompt();
-
-    // Wait for the user to respond to the prompt
-    const choiceResult = await deferredPrompt.userChoice;
-
-    if (choiceResult.outcome === 'accepted') {
-      console.log('User accepted the install prompt');
-      localStorage.setItem(INSTALL_PROMPT_PREF_KEY, PROMPT_INSTALLED_VALUE);
-    } else {
-      console.log('User dismissed the install prompt');
+    try {
+      // Show the install prompt and wait for the user to respond
+      deferredPrompt.prompt();
+      const choiceResult = await deferredPrompt.userChoice;
+      if (choiceResult.outcome === 'accepted') writePref(PROMPT_INSTALLED_VALUE);
+    } catch {
+      /* prompt() can only be called once per event */
     }
 
     // Clear the deferredPrompt as it can only be used once
@@ -70,7 +82,7 @@ const InstallPrompt: React.FC<InstallPromptProps> = ({ onClose }) => {
   };
 
   const handleDismiss = () => {
-    localStorage.setItem(INSTALL_PROMPT_PREF_KEY, PROMPT_DISMISSED_VALUE);
+    writePref(PROMPT_DISMISSED_VALUE);
     setIsVisible(false);
     onClose();
   };
@@ -98,23 +110,11 @@ const InstallPrompt: React.FC<InstallPromptProps> = ({ onClose }) => {
             Maybe Later
           </button>
         </div>
-        <button 
-          className="reset-preference-button"
-          onClick={() => {
-            localStorage.removeItem(INSTALL_PROMPT_PREF_KEY);
-            setIsVisible(false);
-            onClose();
-          }}
-        >
-          Reset Preference
-        </button>
       </div>
     </div>
   );
 };
 
-export const resetInstallPromptPreference = () => {
-  localStorage.removeItem(INSTALL_PROMPT_PREF_KEY);
-};
+export const resetInstallPromptPreference = () => writePref(null);
 
 export default InstallPrompt;

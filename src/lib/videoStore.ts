@@ -15,6 +15,8 @@ export type Video = {
   category: string
   channel?: string
   addedAt?: string
+  /** Hidden from the kids' page but kept in the list (parent panel only). */
+  hidden?: boolean
 }
 
 export type VideoDoc = {
@@ -167,20 +169,50 @@ function isVideo(v: any): v is Video {
   return (
     v &&
     typeof v.id === 'string' &&
+    ID_RE.test(v.id) && // ids end up in image URLs and the player - keep them strict
+
     typeof v.title === 'string' &&
     typeof v.category === 'string'
   )
 }
 
+function normalizeVideos(list: any[]): Video[] {
+  return list.filter(isVideo).map((v) => {
+    // only an explicit `true` hides a video; drop anything else
+    const { hidden, ...rest } = v
+    return hidden === true ? { ...rest, hidden: true } : rest
+  })
+}
+
 function normalizeDoc(raw: any): VideoDoc {
   if (Array.isArray(raw)) {
-    return { version: DOC_VERSION, updatedAt: '', videos: raw.filter(isVideo) }
+    return { version: DOC_VERSION, updatedAt: '', videos: normalizeVideos(raw) }
   }
   return {
     version: typeof raw?.version === 'number' ? raw.version : DOC_VERSION,
     updatedAt: typeof raw?.updatedAt === 'string' ? raw.updatedAt : '',
-    videos: Array.isArray(raw?.videos) ? raw.videos.filter(isVideo) : [],
+    videos: Array.isArray(raw?.videos) ? normalizeVideos(raw.videos) : [],
   }
+}
+
+/** Videos the kids' page shows. */
+export function visibleVideos(list: Video[]): Video[] {
+  return list.filter((v) => !v.hidden)
+}
+
+function addedTime(v: Video): number {
+  const t = typeof v.addedAt === 'string' ? Date.parse(v.addedAt) : NaN
+  return Number.isNaN(t) ? -Infinity : t
+}
+
+/**
+ * Display order: videos added from the parent panel first, newest on top; the
+ * bundled seed videos (no `addedAt`) follow in their original order. Only the
+ * displayed order changes - the stored list keeps insertion order.
+ */
+export function sortNewestFirst(list: Video[]): Video[] {
+  // Array.prototype.sort is stable, so equal timestamps keep their list order
+  return [...list].sort((a, b) => addedTime(b) - addedTime(a) || 0)
 }
 
 export function readCache(): VideoDoc | null {
@@ -233,8 +265,12 @@ export async function readGistDoc(
   config: GistConfig | null = getGistConfig(),
 ): Promise<VideoDoc | null> {
   if (!config || !config.gistId) return null
+  // GitHub serves gists with `Cache-Control: max-age=60`. Bypass the HTTP
+  // cache, otherwise a read right after a write returns the old list and the
+  // next commitOp() silently drops the previous edit.
   const res = await fetch(`${GH_API}/gists/${config.gistId}`, {
     headers: ghHeaders(config.token),
+    cache: 'no-store',
   })
   if (!res.ok) throw new Error(ghMessage(res.status, 'Load list'))
 
@@ -245,7 +281,9 @@ export async function readGistDoc(
 
   let content: string = file.content ?? ''
   if (file.truncated && file.raw_url) {
-    content = await (await fetch(file.raw_url)).text()
+    const raw = await fetch(file.raw_url, { cache: 'no-store' })
+    if (!raw.ok) throw new Error(ghMessage(raw.status, 'Load list'))
+    content = await raw.text()
   }
   if (!content) return { version: DOC_VERSION, updatedAt: '', videos: [] }
   return normalizeDoc(JSON.parse(content))
@@ -266,6 +304,7 @@ export async function writeGistDoc(
   const res = await fetch(`${GH_API}/gists/${config.gistId}`, {
     method: 'PATCH',
     headers: ghHeaders(config.token, true),
+    cache: 'no-store',
     body: JSON.stringify({
       files: { [config.filename]: { content: JSON.stringify(stamped, null, 2) } },
     }),
@@ -341,7 +380,12 @@ export type Op =
   | { type: 'add'; video: Video }
   | { type: 'update'; video: Video }
   | { type: 'delete'; id: string }
+  | { type: 'setHidden'; id: string; hidden: boolean }
   | { type: 'replace'; videos: Video[] }
+
+export function applyOps(list: Video[], ops: Op | Op[]): Video[] {
+  return (Array.isArray(ops) ? ops : [ops]).reduce(applyOp, list)
+}
 
 export function applyOp(list: Video[], op: Op): Video[] {
   switch (op.type) {
@@ -354,37 +398,40 @@ export function applyOp(list: Video[], op: Op): Video[] {
       return list.map((v) => (v.id === op.video.id ? { ...v, ...op.video } : v))
     case 'delete':
       return list.filter((v) => v.id !== op.id)
+    case 'setHidden':
+      // touches only the flag, so a concurrent title edit elsewhere survives
+      return list.map((v) => {
+        if (v.id !== op.id) return v
+        const { hidden: _drop, ...rest } = v
+        return op.hidden ? { ...rest, hidden: true } : rest
+      })
     case 'replace':
       return op.videos
   }
 }
 
 /**
- * Apply an edit and persist it.
+ * Apply one or more edits atomically and persist them.
  *
- * With a Gist configured: re-read the latest remote list, apply the op on top of
- * it (so a concurrent add/edit from another device is preserved), write it back.
+ * With a Gist configured: re-read the latest remote list, apply the ops on top
+ * of it (so a concurrent add/edit from another device is preserved), write it
+ * back. If the remote list can't be read the edit fails rather than overwriting
+ * the shared list with this device's possibly stale copy.
  * Without a Gist: apply against `current` and save to the local cache only.
  *
  * Returns the resulting video list.
  */
-export async function commitOp(current: Video[], op: Op): Promise<Video[]> {
+export async function commitOp(current: Video[], ops: Op | Op[]): Promise<Video[]> {
   const config = getGistConfig()
 
   if (config && config.gistId) {
-    let base = current
-    try {
-      const remote = await readGistDoc(config)
-      if (remote) base = remote.videos
-    } catch {
-      /* remote unreadable - fall back to current in-memory list */
-    }
-    const next = applyOp(base, op)
+    const remote = await readGistDoc(config)
+    const next = applyOps(remote ? remote.videos : current, ops)
     const saved = await writeGistDoc({ version: DOC_VERSION, updatedAt: '', videos: next }, config)
     return saved.videos
   }
 
-  const next = applyOp(current, op)
+  const next = applyOps(current, ops)
   writeCache({ version: DOC_VERSION, updatedAt: new Date().toISOString(), videos: next })
   return next
 }

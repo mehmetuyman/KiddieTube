@@ -1,0 +1,155 @@
+/* KiddieTube themes.
+ *
+ * Each theme overrides the --kt-* tokens declared on :root in styles-v2.css.
+ * "classic" (the original design) has no block here - it *is* the defaults.
+ * The active theme is set as <html data-theme="..."> by src/lib/theme.ts (and
+ * by the inline script in index.html before first paint). Keep the ids in sync
+ * with THEMES in src/lib/theme.ts.
+ */
+
+/* ---------- Sunny (default): warm sky & meadow ---------- */
+:root[data-theme='sunny'] {
+  --kt-font: 'Fredoka', 'Baloo 2', 'Poppins', system-ui, sans-serif;
+  --kt-bg: linear-gradient(180deg, #bfe9ff 0%, #d9f7d2 55%, #fff4c2 100%);
+  --kt-header-bg: linear-gradient(135deg, #ffd23f 0%, #ffa931 100%);
+  --kt-header-text: #5b3200;
+  --kt-header-chip-bg: rgba(255, 255, 255, 0.55);
+  --kt-bar-bg: rgba(255, 255, 255, 0.85);
+  --kt-pill-bg: linear-gradient(135deg, #8be07a 0%, #3cbf77 100%);
+  --kt-pill-text: #ffffff;
+  --kt-pill-radius: 18px;
+  --kt-pill-active-bg: linear-gradient(135deg, #ff9f43 0%, #ff6b4a 100%);
+  --kt-pill-active-text: #ffffff;
+  --kt-pill-active-border: #ffd166;
+  --kt-pill-active-shadow: 0 6px 20px rgba(255, 107, 74, 0.45);
+  --kt-surface: #fffdf6;
+  --kt-radius: 28px;
+  --kt-card-radius: 22px;
+  --kt-controls-bg: #fff1cf;
+  --kt-play-bg: linear-gradient(135deg, #ff9f43 0%, #ff6b4a 100%);
+  --kt-play-shadow: 0 4px 12px rgba(255, 107, 74, 0.45);
+  --kt-play-shadow-hover: 0 6px 16px rgba(255, 107, 74, 0.6);
+  --kt-fs-bg: linear-gradient(135deg, #5ec8f8 0%, #2f8fe8 100%);
+  --kt-fs-shadow: 0 3px 10px rgba(47, 143, 232, 0.4);
+  --kt-fs-shadow-hover: 0 5px 14px rgba(47, 143, 232, 0.6);
+  --kt-skip-bg: linear-gradient(135deg, #8be07a 0%, #3cbf77 100%);
+  --kt-skip-shadow: 0 3px 10px rgba(60, 191, 119, 0.4);
+  --kt-skip-shadow-hover: 0 5px 14px rgba(60, 191, 119, 0.6);
+  --kt-speed-bg: #ffe6a8;
+  --kt-speed-text: #7a4a00;
+  --kt-speed-active-bg: linear-gradient(135deg, #ff9f43 0%, #ff6b4a 100%);
+  --kt-muted-text: #7a6a4f;
+  --kt-text: #3b2f1e;
+  --kt-progress-track: #ffe1a1;
+  --kt-progress-fill: #ff6b4a;
+  --kt-progress-rest: #ffd88a;
+  --kt-thumb: #ff9f43;
+  --kt-thumb-hover: #ff6b4a;
+  --kt-thumb-shadow: 0 3px 10px rgba(255, 107, 74, 0.5);
+  --kt-thumb-shadow-moz: 0 2px 8px rgba(255, 107, 74, 0.4);
+  --kt-thumb-shadow-hover: 0 3px 12px rgba(255, 107, 74, 0.6);
+  --kt-on-bg: #2d5a27;
+  --kt-on-bg-chip: rgba(255, 255, 255, 0.7);
+  --kt-accent: #ff9f43;
+  --kt-accent-shadow: 0 8px 24px rgba(255, 159, 67, 0.5);
+  --kt-playing-bg: rgba(255, 107, 74, 0.95);
+  --kt-shield-bg: rgba(255, 236, 179, 0.96);
+}
+
+/* ---------- Ocean: deep blue & sunshine yellow ---------- */
+:root[data-theme='ocean'] {
+  --kt-font: 'Baloo 2', 'Fredoka', 'Poppins', system-ui, sans-serif;
+  --kt-bg: linear-gradient(180deg, #0f4c81 0%, #1b8bb4 55%, #5fd3c9 100%);
+  --kt-header-bg: linear-gradient(135deg, #0b3a66 0%, #0f5c8f 100%);
+  --kt-header-text: #ffffff;
+  --kt-header-chip-bg: rgba(255, 255, 255, 0.2);
+  --kt-bar-bg: #0d4470;
+  --kt-pill-bg: linear-gradient(135deg, #36d1dc 0%, #2a9df4 100%);
+  --kt-pill-text: #ffffff;
+  --kt-pill-radius: 14px;
+  --kt-pill-active-bg: linear-gradient(135deg, #ffe066 0%, #ffb300 100%);
+  --kt-pill-active-text: #4a3000;
+  --kt-pill-active-border: #fff3c4;
+  --kt-pill-active-shadow: 0 6px 20px rgba(255, 193, 7, 0.45);
+  --kt-surface: #f3fbff;
+  --kt-radius: 22px;
+  --kt-card-radius: 18px;
+  --kt-controls-bg: #dff3fb;
+  --kt-play-bg: linear-gradient(135deg, #ffd54f 0%, #ffa000 100%);
+  --kt-play-shadow: 0 4px 12px rgba(255, 160, 0, 0.45);
+  --kt-play-shadow-hover: 0 6px 16px rgba(255, 160, 0, 0.6);
+  --kt-fs-bg: linear-gradient(135deg, #0f5c8f 0%, #0b3a66 100%);
+  --kt-fs-shadow: 0 3px 10px rgba(11, 58, 102, 0.4);
+  --kt-fs-shadow-hover: 0 5px 14px rgba(11, 58, 102, 0.6);
+  --kt-skip-bg: linear-gradient(135deg, #36d1dc 0%, #2a9df4 100%);
+  --kt-skip-shadow: 0 3px 10px rgba(42, 157, 244, 0.4);
+  --kt-skip-shadow-hover: 0 5px 14px rgba(42, 157, 244, 0.6);
+  --kt-speed-bg: #cdeaf7;
+  --kt-speed-text: #0b3a66;
+  --kt-speed-active-bg: linear-gradient(135deg, #ffd54f 0%, #ffa000 100%);
+  --kt-muted-text: #4f6b80;
+  --kt-text: #12304a;
+  --kt-progress-track: #bfe3f2;
+  --kt-progress-fill: #ffa000;
+  --kt-progress-rest: #9fd0e6;
+  --kt-thumb: #2a9df4;
+  --kt-thumb-hover: #0f5c8f;
+  --kt-thumb-shadow: 0 3px 10px rgba(42, 157, 244, 0.5);
+  --kt-thumb-shadow-moz: 0 2px 8px rgba(42, 157, 244, 0.4);
+  --kt-thumb-shadow-hover: 0 3px 12px rgba(42, 157, 244, 0.6);
+  --kt-on-bg: #ffffff;
+  --kt-on-bg-chip: rgba(255, 255, 255, 0.22);
+  --kt-accent: #ffc107;
+  --kt-accent-shadow: 0 8px 24px rgba(255, 193, 7, 0.5);
+  --kt-playing-bg: rgba(15, 92, 143, 0.92);
+  --kt-shield-bg: rgba(170, 215, 235, 0.96);
+}
+
+/* ---------- Candy: soft pastels ---------- */
+:root[data-theme='candy'] {
+  --kt-font: 'Fredoka', 'Baloo 2', 'Poppins', system-ui, sans-serif;
+  --kt-bg: linear-gradient(135deg, #ffd6e8 0%, #e5d4ff 50%, #c9f0ff 100%);
+  --kt-header-bg: linear-gradient(135deg, #ff7eb3 0%, #b57bff 100%);
+  --kt-header-text: #ffffff;
+  --kt-header-chip-bg: rgba(255, 255, 255, 0.3);
+  --kt-bar-bg: rgba(255, 255, 255, 0.8);
+  --kt-pill-bg: linear-gradient(135deg, #b57bff 0%, #7f8cff 100%);
+  --kt-pill-text: #ffffff;
+  --kt-pill-radius: 30px;
+  --kt-pill-active-bg: linear-gradient(135deg, #ff7eb3 0%, #ff5c8a 100%);
+  --kt-pill-active-text: #ffffff;
+  --kt-pill-active-border: #ffd1e3;
+  --kt-pill-active-shadow: 0 6px 20px rgba(255, 92, 138, 0.45);
+  --kt-surface: #ffffff;
+  --kt-radius: 30px;
+  --kt-card-radius: 22px;
+  --kt-controls-bg: #fde8f3;
+  --kt-play-bg: linear-gradient(135deg, #ff7eb3 0%, #ff5c8a 100%);
+  --kt-play-shadow: 0 4px 12px rgba(255, 92, 138, 0.45);
+  --kt-play-shadow-hover: 0 6px 16px rgba(255, 92, 138, 0.6);
+  --kt-fs-bg: linear-gradient(135deg, #b57bff 0%, #7f8cff 100%);
+  --kt-fs-shadow: 0 3px 10px rgba(127, 140, 255, 0.4);
+  --kt-fs-shadow-hover: 0 5px 14px rgba(127, 140, 255, 0.6);
+  --kt-skip-bg: linear-gradient(135deg, #7ee8c7 0%, #3cc6a4 100%);
+  --kt-skip-shadow: 0 3px 10px rgba(60, 198, 164, 0.4);
+  --kt-skip-shadow-hover: 0 5px 14px rgba(60, 198, 164, 0.6);
+  --kt-speed-bg: #f3e3ff;
+  --kt-speed-text: #6a3fa0;
+  --kt-speed-active-bg: linear-gradient(135deg, #ff7eb3 0%, #ff5c8a 100%);
+  --kt-muted-text: #8a6b8f;
+  --kt-text: #3d2a47;
+  --kt-progress-track: #f7d3e6;
+  --kt-progress-fill: #ff5c8a;
+  --kt-progress-rest: #eab8d3;
+  --kt-thumb: #ff5c8a;
+  --kt-thumb-hover: #e8437a;
+  --kt-thumb-shadow: 0 3px 10px rgba(255, 92, 138, 0.5);
+  --kt-thumb-shadow-moz: 0 2px 8px rgba(255, 92, 138, 0.4);
+  --kt-thumb-shadow-hover: 0 3px 12px rgba(255, 92, 138, 0.6);
+  --kt-on-bg: #6a3fa0;
+  --kt-on-bg-chip: rgba(255, 255, 255, 0.7);
+  --kt-accent: #ff5c8a;
+  --kt-accent-shadow: 0 8px 24px rgba(255, 92, 138, 0.5);
+  --kt-playing-bg: rgba(181, 123, 255, 0.95);
+  --kt-shield-bg: rgba(255, 214, 232, 0.96);
+}

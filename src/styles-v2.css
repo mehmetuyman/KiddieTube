@@ -1,5 +1,57 @@
 /* Kid-Friendly KiddieTube v2.0 Styles */
 
+/* ========== Theme tokens ==========
+   Defaults are the original ("Classic") design. Other themes override these
+   in themes.css via <html data-theme="...">. */
+:root {
+  --kt-font: 'Baloo 2', 'Comic Neue', 'Fredoka', 'Poppins', system-ui, sans-serif;
+  --kt-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --kt-header-bg: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+  --kt-header-text: white;
+  --kt-header-chip-bg: rgba(255, 255, 255, 0.25);
+  --kt-bar-bg: white;
+  --kt-pill-bg: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --kt-pill-text: white;
+  --kt-pill-radius: 25px;
+  --kt-pill-active-bg: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --kt-pill-active-border: #4a90e2;
+  --kt-pill-active-text: white;
+  --kt-pill-active-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
+  --kt-surface: white;
+  --kt-radius: 20px;
+  --kt-card-radius: 16px;
+  --kt-controls-bg: #f5f5f5;
+  --kt-play-bg: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --kt-play-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);
+  --kt-play-shadow-hover: 0 6px 16px rgba(79, 172, 254, 0.6);
+  --kt-fs-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --kt-fs-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+  --kt-fs-shadow-hover: 0 5px 14px rgba(102, 126, 234, 0.6);
+  --kt-skip-bg: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+  --kt-skip-shadow: 0 3px 10px rgba(255, 216, 155, 0.4);
+  --kt-skip-shadow-hover: 0 5px 14px rgba(255, 216, 155, 0.6);
+  --kt-speed-bg: #e3e8ef;
+  --kt-speed-text: #35506b;
+  --kt-speed-active-bg: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  --kt-muted-text: #666;
+  --kt-text: #333;
+  --kt-progress-track: #ddd;
+  /* seek bar played / unplayed colours (applied inline by YouTubeWrapper) */
+  --kt-progress-fill: red;
+  --kt-progress-rest: #555;
+  --kt-thumb: #4a90e2;
+  --kt-thumb-hover: #357abd;
+  --kt-thumb-shadow: 0 3px 10px rgba(74, 144, 226, 0.5);
+  --kt-thumb-shadow-moz: 0 2px 8px rgba(74, 144, 226, 0.4);
+  --kt-thumb-shadow-hover: 0 3px 12px rgba(74, 144, 226, 0.6);
+  --kt-on-bg: white;
+  --kt-on-bg-chip: rgba(255, 255, 255, 0.25);
+  --kt-accent: #4a90e2;
+  --kt-accent-shadow: 0 8px 24px rgba(74, 144, 226, 0.5);
+  --kt-playing-bg: rgba(74, 144, 226, 0.95);
+  --kt-shield-bg: rgba(165, 150, 150, 0.95);
+}
+
 /* ========== Base & Reset ========== */
 * {
   box-sizing: border-box;
@@ -13,11 +65,15 @@ html {
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Baloo 2', 'Comic Neue', 'Fredoka', 'Poppins', system-ui, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: var(--kt-font);
+  background: var(--kt-bg);
   min-height: 100vh;
   min-height: 100dvh;
+  /* `clip`, not `hidden`: on iOS Safari `overflow-x: hidden` on body stops
+     position: sticky from working (the frozen header/category bar). `hidden`
+     stays as the fallback for browsers without `clip`. */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .app-container {
@@ -26,17 +82,170 @@ body {
   padding: 0;
 }
 
+/* Nothing on the kids' page is meant to be selected or saved. On phones a
+   long press (e.g. on the logo to open the parent panel) otherwise selects
+   nearby text/emoji or pops the "save image" menu on thumbnails. The parent
+   panel (.pp-overlay) is outside these and stays selectable/editable. */
+.app-header,
+.category-pills-container,
+.player-section,
+.video-grid-section {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-header img,
+.video-grid-section img {
+  -webkit-user-drag: none;
+}
+
+/* ========== Pinned top block (header + category row) ==========
+   Fixed to the top of the screen (sticky was unreliable on iPhone) and shrinks
+   to a compact size once scrolled (class set by useCompactOnScroll). Being
+   fixed it takes no room in the page; .app-top-spacer holds its full height
+   (set by the same hook) so content starts below it and never jumps.
+   Sits below the parent panel and fullscreen video. */
+.app-top {
+  --kt-compact-t: 0.25s ease;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* same width/centering as .app-container */
+  max-width: 1200px;
+  margin: 0 auto;
+  z-index: 1000;
+}
+
+.app-top-spacer {
+  height: 178px; /* replaced by the measured full height */
+}
+
+.app-top .app-header,
+.app-top .app-logo,
+.app-top .brand-title,
+.app-top .version-badge,
+.app-top .category-pills-container,
+.app-top .category-pills,
+.app-top .category-pill,
+.app-top .category-emoji,
+.app-top .category-name {
+  transition: padding var(--kt-compact-t), width var(--kt-compact-t), height var(--kt-compact-t),
+    font-size var(--kt-compact-t), transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+/* measuring pass: no animation */
+.app-top.is-measuring,
+.app-top.is-measuring * {
+  transition: none !important;
+}
+
+.app-top.is-compact .app-header {
+  padding: 4px 12px;
+}
+
+.app-top.is-compact .app-logo {
+  width: 30px;
+  height: 30px;
+}
+
+.app-top.is-compact .brand-title {
+  font-size: 1.15rem;
+}
+
+.app-top.is-compact .version-badge {
+  padding: 2px 8px;
+  font-size: 0.65rem;
+}
+
+.app-top.is-compact .category-pills-container {
+  padding: 4px 12px;
+}
+
+.app-top.is-compact .category-pills {
+  padding: 2px 4px;
+}
+
+.app-top.is-compact .category-pill {
+  padding: 4px 12px;
+}
+
+.app-top.is-compact .category-pill.active {
+  transform: scale(1.05);
+}
+
+.app-top.is-compact .category-emoji {
+  font-size: 1rem;
+}
+
+.app-top.is-compact .category-name {
+  font-size: 0.8rem;
+}
+
+body.pseudo-fullscreen .app-top {
+  display: none !important;
+}
+
+/* Phones in landscape: two full-size rows took half the screen height. Put
+   the logo and the category row side by side in one slim row instead (the
+   logo keeps its long-press). Compact-on-scroll then has nothing left to do. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app-top {
+    display: flex;
+    align-items: stretch;
+  }
+  .app-top .app-header,
+  .app-top.is-compact .app-header {
+    flex: none;
+    padding: 4px 10px;
+  }
+  .app-top .brand-clickable {
+    gap: 8px;
+  }
+  .app-top .app-logo {
+    width: 30px;
+    height: 30px;
+  }
+  .app-top .brand-title {
+    font-size: 1rem;
+  }
+  .app-top .version-badge {
+    display: none;
+  }
+  .app-top .category-pills-container,
+  .app-top.is-compact .category-pills-container {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+  }
+  .app-top .category-pills {
+    gap: 8px;
+    padding: 2px 4px;
+  }
+  .app-top .category-pill {
+    padding: 4px 12px;
+  }
+  .app-top .category-pill.active {
+    transform: scale(1.05);
+  }
+  .app-top .category-emoji {
+    font-size: 1rem;
+  }
+  .app-top .category-name {
+    font-size: 0.8rem;
+  }
+}
+
 /* ========== Header ========== */
 .app-header {
-  background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+  background: var(--kt-header-bg);
   padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  position: sticky;
-  top: 0;
-  z-index: 1000;
 }
 
 .brand-clickable {
@@ -45,6 +254,10 @@ body {
   gap: 12px;
   cursor: pointer;
   transition: transform 0.2s ease;
+  /* long-press opens the parent panel - don't show the OS image/select menu */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .brand-clickable:hover {
@@ -65,14 +278,14 @@ body {
 .brand-title {
   font-size: 1.8rem;
   font-weight: 700;
-  color: white;
+  color: var(--kt-header-text);
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
   white-space: nowrap;
 }
 
 .version-badge {
-  background: rgba(255, 255, 255, 0.25);
-  color: white;
+  background: var(--kt-header-chip-bg);
+  color: var(--kt-header-text);
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 0.75rem;
@@ -81,7 +294,7 @@ body {
 
 /* ========== Category Pills ========== */
 .category-pills-container {
-  background: white;
+  background: var(--kt-bar-bg);
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
@@ -89,10 +302,25 @@ body {
   /* Hide scrollbar */
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* some themes use a translucent bar - soften what scrolls underneath */
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .category-pills-container::-webkit-scrollbar {
   display: none;
+}
+
+/* mouse users can click-drag the row (see useDragScroll) */
+@media (hover: hover) and (pointer: fine) {
+  .category-pills-container {
+    cursor: grab;
+  }
+  .category-pills-container.is-dragging,
+  .category-pills-container.is-dragging .category-pill {
+    cursor: grabbing;
+    user-select: none;
+  }
 }
 
 .category-pills {
@@ -107,9 +335,9 @@ body {
   gap: 8px;
   padding: 12px 20px;
   border: 3px solid transparent;
-  border-radius: 25px;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
+  border-radius: var(--kt-pill-radius);
+  background: var(--kt-pill-bg);
+  color: var(--kt-pill-text);
   font-size: 1rem;
   font-weight: 600;
   white-space: nowrap;
@@ -129,10 +357,11 @@ body {
 }
 
 .category-pill.active {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  border-color: #4a90e2;
+  background: var(--kt-pill-active-bg);
+  color: var(--kt-pill-active-text);
+  border-color: var(--kt-pill-active-border);
   transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
+  box-shadow: var(--kt-pill-active-shadow);
 }
 
 .category-emoji {
@@ -155,12 +384,22 @@ body {
 
 /* ========== Player Section ========== */
 .player-section {
-  background: white;
+  background: var(--kt-surface);
   margin: 16px;
-  border-radius: 20px;
+  border-radius: var(--kt-radius);
   padding: 16px;
   padding-bottom: 12px; /* Less padding at bottom */
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* The player's layers use very high z-indexes (tap guard 9997, pause shield
+   9998, controls 10000). Keep them inside the player so they can't cover the
+   frozen top bar (z 1000) when the player scrolls underneath it - otherwise
+   the invisible guard swallows taps/scrolls meant for the categories and the
+   pause screen draws over the bar. Not in pseudo-fullscreen: there the player
+   must cover the whole page (native fullscreen uses the top layer anyway). */
+body:not(.pseudo-fullscreen) .player-section {
+  isolation: isolate;
 }
 
 .video-container {
@@ -172,7 +411,7 @@ body {
   width: 100%;
   padding-top: 56.25%; /* 16:9 aspect ratio */
   background: #000;
-  border-radius: 16px;
+  border-radius: var(--kt-card-radius);
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
@@ -228,16 +467,35 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #f5f5f5;
+  background: var(--kt-controls-bg);
   padding: 10px 12px;
   border-radius: 12px;
   margin-top: 12px;
 }
 
 @media (max-width: 480px) {
+  /* Too narrow for one row (the buttons plus a usable seek bar overflowed and
+     clipped the fullscreen button): seek bar + times on top, buttons below. */
   .controls-bottom {
     gap: 6px;
     padding: 8px 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 4px; /* applied twice around the zero-height break */
+  }
+  .controls-bottom #currentTime { order: -3; }
+  .controls-bottom .progress-slider {
+    order: -2;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .controls-bottom #duration { order: -1; }
+  /* forces the buttons onto the second row */
+  .controls-bottom::after {
+    content: '';
+    order: -1;
+    flex-basis: 100%;
+    height: 0;
   }
 }
 
@@ -245,13 +503,13 @@ body {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background: var(--kt-play-bg);
   color: white;
   border: none;
   font-size: 1.8rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);
+  box-shadow: var(--kt-play-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -260,7 +518,7 @@ body {
 
 .control-btn-play:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(79, 172, 254, 0.6);
+  box-shadow: var(--kt-play-shadow-hover);
 }
 
 .control-btn-play:active {
@@ -279,13 +537,13 @@ body {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--kt-fs-bg);
   color: white;
   border: none;
   font-size: 1.3rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+  box-shadow: var(--kt-fs-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -294,7 +552,7 @@ body {
 
 .control-btn-fullscreen:hover {
   transform: scale(1.1);
-  box-shadow: 0 5px 14px rgba(102, 126, 234, 0.6);
+  box-shadow: var(--kt-fs-shadow-hover);
 }
 
 .control-btn-fullscreen:active {
@@ -313,13 +571,13 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+  background: var(--kt-skip-bg);
   color: white;
   border: none;
   font-size: 1.1rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 3px 10px rgba(255, 216, 155, 0.4);
+  box-shadow: var(--kt-skip-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -328,7 +586,7 @@ body {
 
 .control-btn-skip:hover {
   transform: scale(1.1);
-  box-shadow: 0 5px 14px rgba(255, 216, 155, 0.6);
+  box-shadow: var(--kt-skip-shadow-hover);
 }
 
 .control-btn-skip:active {
@@ -364,9 +622,38 @@ body {
   }
 }
 
+.control-btn-speed {
+  min-width: 44px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 16px;
+  border: none;
+  background: var(--kt-speed-bg);
+  color: var(--kt-speed-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.control-btn-speed.active {
+  background: var(--kt-speed-active-bg);
+  color: #fff;
+}
+
+@media (max-width: 480px) {
+  .control-btn-speed {
+    min-width: 38px;
+    height: 28px;
+    padding: 0 6px;
+    font-size: 0.72rem;
+  }
+}
+
 .time-display {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--kt-muted-text);
   font-weight: 600;
   min-width: 45px;
   text-align: center;
@@ -383,7 +670,7 @@ body {
   flex: 1;
   height: 18px;
   border-radius: 9px;
-  background: #ddd;
+  background: var(--kt-progress-track);
   outline: none;
   -webkit-appearance: none;
   appearance: none;
@@ -396,10 +683,10 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #4a90e2;
+  background: var(--kt-thumb);
   cursor: grab;
   transition: all 0.2s ease;
-  box-shadow: 0 3px 10px rgba(74, 144, 226, 0.5);
+  box-shadow: var(--kt-thumb-shadow);
 }
 
 .progress-slider::-webkit-slider-thumb:active {
@@ -409,19 +696,19 @@ body {
 
 .progress-slider::-webkit-slider-thumb:hover {
   transform: scale(1.2);
-  background: #357abd;
-  box-shadow: 0 3px 12px rgba(74, 144, 226, 0.6);
+  background: var(--kt-thumb-hover);
+  box-shadow: var(--kt-thumb-shadow-hover);
 }
 
 .progress-slider::-moz-range-thumb {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #4a90e2;
+  background: var(--kt-thumb);
   cursor: grab;
   border: none;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.4);
+  box-shadow: var(--kt-thumb-shadow-moz);
 }
 
 .progress-slider::-moz-range-thumb:active {
@@ -431,15 +718,15 @@ body {
 
 .progress-slider::-moz-range-thumb:hover {
   transform: scale(1.2);
-  background: #357abd;
-  box-shadow: 0 3px 12px rgba(74, 144, 226, 0.6);
+  background: var(--kt-thumb-hover);
+  box-shadow: var(--kt-thumb-shadow-hover);
 }
 
 /* Video Info */
 .video-title {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #333;
+  color: var(--kt-text);
   margin: 8px 0 4px 0;
   line-height: 1.3;
 }
@@ -453,7 +740,7 @@ body {
 
 .video-category {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--kt-muted-text);
   margin: 0;
 }
 
@@ -483,12 +770,12 @@ body {
 .grid-title {
   font-size: 1.3rem;
   font-weight: 700;
-  color: white;
+  color: var(--kt-on-bg);
 }
 
 .grid-count {
-  background: rgba(255, 255, 255, 0.25);
-  color: white;
+  background: var(--kt-on-bg-chip);
+  color: var(--kt-on-bg);
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 0.9rem;
@@ -502,8 +789,8 @@ body {
 }
 
 .video-card {
-  background: white;
-  border-radius: 16px;
+  background: var(--kt-surface);
+  border-radius: var(--kt-card-radius);
   overflow: hidden;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -520,8 +807,8 @@ body {
 }
 
 .video-card.active {
-  border: 4px solid #4a90e2;
-  box-shadow: 0 8px 24px rgba(74, 144, 226, 0.5);
+  border: 4px solid var(--kt-accent);
+  box-shadow: var(--kt-accent-shadow);
 }
 
 .video-thumbnail-wrapper {
@@ -546,7 +833,7 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(74, 144, 226, 0.95);
+  background: var(--kt-playing-bg);
   color: white;
   padding: 12px 24px;
   border-radius: 25px;
@@ -581,7 +868,7 @@ body {
   padding: 12px;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #333;
+  color: var(--kt-text);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -596,7 +883,7 @@ body {
   position: absolute;
   inset: 0;
   /* Absolute path includes the Vite `base` (/KiddieTube/) so it resolves on GitHub Pages */
-  background: rgba(165, 150, 150, 0.95) url('/KiddieTube/assets/logo_no_bg.png') center/250px no-repeat;
+  background: var(--kt-shield-bg) url('/KiddieTube/assets/logo_no_bg.png') center/250px no-repeat;
   z-index: 9998;
   display: none;
   opacity: 0;
@@ -715,8 +1002,24 @@ body.pseudo-fullscreen .video-container {
 body.pseudo-fullscreen {
   overflow: hidden !important;
   position: fixed !important;
+  /* `top` is set inline to -scrollY so the page stays where it was
+     (YouTubeWrapper.enterPseudoFullscreen) */
+  left: 0;
+  right: 0;
   width: 100% !important;
   height: 100% !important;
+}
+
+/* Give the overlay controls their own compositing layers so iOS WebKit
+   hit-tests them above the YouTube iframe (it otherwise can hand taps to the
+   iframe's layer after a rotation even though the controls are drawn on top). */
+.video-container.pseudo-fullscreen .custom-controls {
+  transform: translate3d(-50%, 0, 0);
+}
+
+.video-container.pseudo-fullscreen .control-btn-topright,
+.video-container.pseudo-fullscreen .iframe-guard-full {
+  transform: translateZ(0);
 }
 
 body.pseudo-fullscreen .app-header {
@@ -949,6 +1252,134 @@ body.pseudo-fullscreen .app-header {
   font-size: 0.78rem;
 }
 
+.pp-row.is-hidden .pp-thumb,
+.pp-row.is-hidden .pp-row-title {
+  opacity: 0.45;
+}
+
+.pp-row.is-hidden .pp-thumb {
+  filter: grayscale(1);
+}
+
+.pp-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: #fff3cd;
+  color: #8a6d00;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.pp-seg {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 3px;
+  background: #eef2f7;
+  border-radius: 10px;
+}
+
+.pp-seg-btn {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: transparent;
+  color: #35506b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pp-seg-btn.active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.pp-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.pp-theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid #e3e8ef;
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.pp-theme-card.active {
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+}
+
+.pp-theme-preview {
+  position: relative;
+  display: block;
+  height: 86px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pp-theme-preview-header {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 18px;
+}
+
+.pp-theme-preview-pills {
+  position: absolute;
+  top: 26px;
+  left: 8px;
+  display: flex;
+  gap: 5px;
+}
+
+.pp-theme-preview-pills span {
+  width: 26px;
+  height: 14px;
+  border-radius: 7px;
+}
+
+.pp-theme-preview-play {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.pp-theme-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #222;
+}
+
+.pp-theme-label small {
+  font-weight: 500;
+  color: #888;
+}
+
+.pp-theme-check {
+  margin-left: auto;
+  color: #4a90e2;
+}
+
 .pp-empty {
   padding: 24px 0;
   text-align: center;
@@ -1044,5 +1475,92 @@ body.pseudo-fullscreen .app-header {
     max-width: none;
     max-height: 94vh;
     border-radius: 20px 20px 0 0;
+  }
+}
+
+/* ========== Install Prompt ========== */
+.install-prompt {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  padding: 20px;
+  width: 90%;
+  max-width: 400px;
+  animation: slideUp 0.3s ease-out;
+}
+
+.install-prompt-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.install-prompt-logo {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 12px;
+}
+
+.install-prompt h2 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.install-prompt p {
+  margin: 0 0 16px 0;
+  color: #666;
+}
+
+.install-prompt-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  width: 100%;
+}
+
+.install-button {
+  padding: 10px 24px;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.install-button:hover {
+  background-color: #357abd;
+}
+
+.close-button {
+  padding: 10px 24px;
+  background-color: transparent;
+  color: #666;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.close-button:hover {
+  background-color: #f5f5f5;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
   }
 }
