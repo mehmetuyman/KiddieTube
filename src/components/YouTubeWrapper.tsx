@@ -224,18 +224,28 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
     updateButtonStates()
   }
 
-  // iOS WebKit keeps stale touch targets for fixed-position layers after a
-  // rotation (drawn in the new place, tappable in the old one - rotating back
-  // "fixes" it). Rebuilding the overlay layers once the rotation has settled
-  // makes it recompute them.
-  function refreshOverlayLayers() {
-    if (!document.body.classList.contains('pseudo-fullscreen')) return
+  // iOS WebKit can keep stale touch targets after a rotation: things are drawn
+  // in the new place but respond in the old one (rotating back "fixes" it).
+  // Runs once a rotation has settled, in fullscreen AND on the normal page
+  // (e.g. after leaving auto-fullscreen by rotating back to portrait):
+  // rebuilding the layers and nudging the scroll position makes WebKit
+  // recompute them.
+  function refreshTouchTargets() {
+    const inPseudo = document.body.classList.contains('pseudo-fullscreen')
     const els = document.querySelectorAll<HTMLElement>(
-      '.video-container .custom-controls, #btnExitPseudoFs, .video-container .iframe-guard-full',
+      inPseudo
+        ? '.video-container .custom-controls, #btnExitPseudoFs, .video-container .iframe-guard-full'
+        : '.video-container .custom-controls, .app-top, .video-container .iframe-guard-full',
     )
     els.forEach((el) => (el.style.display = 'none'))
     void document.body.offsetHeight
     els.forEach((el) => (el.style.display = ''))
+    if (!inPseudo) {
+      const y = window.scrollY
+      const nudge = y > 0 ? y - 1 : y + 1
+      window.scrollTo({ top: nudge, behavior: 'instant' as ScrollBehavior })
+      window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
+    }
   }
 
   // Lock to portrait when not playing, allow rotation when playing. Driven by
@@ -538,7 +548,7 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
 
     // Landscape while playing -> pseudo-fullscreen; back to portrait -> leave
     // it again, but only if it was entered automatically.
-    const handleOrientationChange = () => {
+    const applyOrientation = () => {
       const container = document.querySelector('.video-container') as HTMLElement | null
       if (!container) return
 
@@ -556,17 +566,29 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
       if (!isAlreadyFullscreen) enterPseudoFullscreen(true)
     }
 
-    // Still in pseudo-fullscreen after a rotation (entered with the button, or
-    // entered in one orientation and rotated): rebuild the overlay's touch
-    // targets once the new size has settled (iOS reports it late).
+    // A rotation is handled only once it has settled (iOS reports the new size
+    // late, and entering/leaving fullscreen mid-rotation left stale touch
+    // targets): then apply auto-fullscreen and refresh the touch targets.
+    // Any resize also re-arms the timer, so this runs after the last one.
     let settleTimer: number | null = null
-    const onViewportChange = () => {
+    let rotationPending = false
+    const settle = () => {
       if (settleTimer) window.clearTimeout(settleTimer)
       settleTimer = window.setTimeout(() => {
         settleTimer = null
-        refreshOverlayLayers()
+        if (rotationPending) {
+          rotationPending = false
+          applyOrientation()
+        }
+        // after the layout change above has been laid out
+        window.setTimeout(refreshTouchTargets, 60)
       }, 350)
     }
+    const handleOrientationChange = () => {
+      rotationPending = true
+      settle()
+    }
+    const onViewportChange = () => settle()
     window.addEventListener('resize', onViewportChange)
     viewportHandlerRef.current = onViewportChange
 
