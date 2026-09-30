@@ -18,6 +18,7 @@ import {
   verifyPin,
   LoadSource,
 } from '../lib/videoStore'
+import { THEMES, DEFAULT_THEME, ThemeId, getTheme, setTheme } from '../lib/theme'
 
 type Props = {
   open: boolean
@@ -62,7 +63,8 @@ export default function ParentPanel({
   onVideosChange,
   onRefresh,
 }: Props) {
-  const [tab, setTab] = useState<'videos' | 'sync'>('videos')
+  const [tab, setTab] = useState<'videos' | 'sync' | 'theme'>('videos')
+  const [themeId, setThemeId] = useState<ThemeId>(() => getTheme())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -389,6 +391,12 @@ export default function ParentPanel({
           >
             Sync {connected ? '✓' : ''}
           </button>
+          <button
+            className={`pp-tab ${tab === 'theme' ? 'active' : ''}`}
+            onClick={() => setTab('theme')}
+          >
+            Theme
+          </button>
         </div>
 
         <div className="pp-body">
@@ -532,6 +540,45 @@ export default function ParentPanel({
                 <button className="pp-btn pp-btn-primary" onClick={saveForm} disabled={busy}>
                   {busy ? 'Saving…' : form.mode === 'add' ? 'Add' : 'Save'}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {tab === 'theme' && (
+            <div className="pp-themes">
+              <p className="pp-sync-status">
+                Pick how the app looks. Saved on <b>this device only</b> — other devices keep their own
+                theme.
+              </p>
+              <div className="pp-theme-grid">
+                {THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    className={`pp-theme-card ${themeId === t.id ? 'active' : ''}`}
+                    aria-pressed={themeId === t.id}
+                    onClick={() => {
+                      setTheme(t.id)
+                      setThemeId(t.id)
+                    }}
+                  >
+                    <span className="pp-theme-preview" style={{ background: t.preview.bg }} aria-hidden="true">
+                      <span className="pp-theme-preview-header" style={{ background: t.preview.header }} />
+                      <span className="pp-theme-preview-pills">
+                        <span style={{ background: t.preview.pillActive }} />
+                        <span style={{ background: t.preview.pill }} />
+                        <span style={{ background: t.preview.pill }} />
+                      </span>
+                      <span className="pp-theme-preview-play" style={{ background: t.preview.play }} />
+                    </span>
+                    <span className="pp-theme-label">
+                      <span>
+                        {t.emoji} {t.name} <small>/ {t.en}</small>
+                      </span>
+                      {t.id === DEFAULT_THEME && <span className="pp-tag">Default</span>}
+                      {themeId === t.id && <span className="pp-theme-check">✓</span>}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}

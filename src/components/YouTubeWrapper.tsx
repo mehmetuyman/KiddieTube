@@ -458,7 +458,8 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
             progressBar.max = String(duration)
             progressBar.value = String(current)
             const percent = (current / duration) * 100
-            progressBar.style.background = `linear-gradient(to right, red 0%, red ${percent}%, #555 ${percent}%, #555 100%)`
+            // colours come from the active theme (see --kt-progress-* in styles-v2.css)
+            progressBar.style.background = `linear-gradient(to right, var(--kt-progress-fill) 0%, var(--kt-progress-fill) ${percent}%, var(--kt-progress-rest) ${percent}%, var(--kt-progress-rest) 100%)`
           }
 
           if (currentTimeEl) currentTimeEl.textContent = formatTime(current)

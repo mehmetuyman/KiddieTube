@@ -1,5 +1,57 @@
 /* Kid-Friendly KiddieTube v2.0 Styles */
 
+/* ========== Theme tokens ==========
+   Defaults are the original ("Classic") design. Other themes override these
+   in themes.css via <html data-theme="...">. */
+:root {
+  --kt-font: 'Baloo 2', 'Comic Neue', 'Fredoka', 'Poppins', system-ui, sans-serif;
+  --kt-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --kt-header-bg: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+  --kt-header-text: white;
+  --kt-header-chip-bg: rgba(255, 255, 255, 0.25);
+  --kt-bar-bg: white;
+  --kt-pill-bg: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --kt-pill-text: white;
+  --kt-pill-radius: 25px;
+  --kt-pill-active-bg: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --kt-pill-active-border: #4a90e2;
+  --kt-pill-active-text: white;
+  --kt-pill-active-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
+  --kt-surface: white;
+  --kt-radius: 20px;
+  --kt-card-radius: 16px;
+  --kt-controls-bg: #f5f5f5;
+  --kt-play-bg: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --kt-play-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);
+  --kt-play-shadow-hover: 0 6px 16px rgba(79, 172, 254, 0.6);
+  --kt-fs-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --kt-fs-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+  --kt-fs-shadow-hover: 0 5px 14px rgba(102, 126, 234, 0.6);
+  --kt-skip-bg: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+  --kt-skip-shadow: 0 3px 10px rgba(255, 216, 155, 0.4);
+  --kt-skip-shadow-hover: 0 5px 14px rgba(255, 216, 155, 0.6);
+  --kt-speed-bg: #e3e8ef;
+  --kt-speed-text: #35506b;
+  --kt-speed-active-bg: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  --kt-muted-text: #666;
+  --kt-text: #333;
+  --kt-progress-track: #ddd;
+  /* seek bar played / unplayed colours (applied inline by YouTubeWrapper) */
+  --kt-progress-fill: red;
+  --kt-progress-rest: #555;
+  --kt-thumb: #4a90e2;
+  --kt-thumb-hover: #357abd;
+  --kt-thumb-shadow: 0 3px 10px rgba(74, 144, 226, 0.5);
+  --kt-thumb-shadow-moz: 0 2px 8px rgba(74, 144, 226, 0.4);
+  --kt-thumb-shadow-hover: 0 3px 12px rgba(74, 144, 226, 0.6);
+  --kt-on-bg: white;
+  --kt-on-bg-chip: rgba(255, 255, 255, 0.25);
+  --kt-accent: #4a90e2;
+  --kt-accent-shadow: 0 8px 24px rgba(74, 144, 226, 0.5);
+  --kt-playing-bg: rgba(74, 144, 226, 0.95);
+  --kt-shield-bg: rgba(165, 150, 150, 0.95);
+}
+
 /* ========== Base & Reset ========== */
 * {
   box-sizing: border-box;
@@ -13,8 +65,8 @@ html {
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Baloo 2', 'Comic Neue', 'Fredoka', 'Poppins', system-ui, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: var(--kt-font);
+  background: var(--kt-bg);
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
@@ -28,7 +80,7 @@ body {
 
 /* ========== Header ========== */
 .app-header {
-  background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+  background: var(--kt-header-bg);
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -69,14 +121,14 @@ body {
 .brand-title {
   font-size: 1.8rem;
   font-weight: 700;
-  color: white;
+  color: var(--kt-header-text);
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
   white-space: nowrap;
 }
 
 .version-badge {
-  background: rgba(255, 255, 255, 0.25);
-  color: white;
+  background: var(--kt-header-chip-bg);
+  color: var(--kt-header-text);
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 0.75rem;
@@ -85,7 +137,7 @@ body {
 
 /* ========== Category Pills ========== */
 .category-pills-container {
-  background: white;
+  background: var(--kt-bar-bg);
   padding: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
@@ -123,9 +175,9 @@ body {
   gap: 8px;
   padding: 12px 20px;
   border: 3px solid transparent;
-  border-radius: 25px;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
+  border-radius: var(--kt-pill-radius);
+  background: var(--kt-pill-bg);
+  color: var(--kt-pill-text);
   font-size: 1rem;
   font-weight: 600;
   white-space: nowrap;
@@ -145,10 +197,11 @@ body {
 }
 
 .category-pill.active {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  border-color: #4a90e2;
+  background: var(--kt-pill-active-bg);
+  color: var(--kt-pill-active-text);
+  border-color: var(--kt-pill-active-border);
   transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
+  box-shadow: var(--kt-pill-active-shadow);
 }
 
 .category-emoji {
@@ -171,9 +224,9 @@ body {
 
 /* ========== Player Section ========== */
 .player-section {
-  background: white;
+  background: var(--kt-surface);
   margin: 16px;
-  border-radius: 20px;
+  border-radius: var(--kt-radius);
   padding: 16px;
   padding-bottom: 12px; /* Less padding at bottom */
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -188,7 +241,7 @@ body {
   width: 100%;
   padding-top: 56.25%; /* 16:9 aspect ratio */
   background: #000;
-  border-radius: 16px;
+  border-radius: var(--kt-card-radius);
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
@@ -244,7 +297,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #f5f5f5;
+  background: var(--kt-controls-bg);
   padding: 10px 12px;
   border-radius: 12px;
   margin-top: 12px;
@@ -280,13 +333,13 @@ body {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background: var(--kt-play-bg);
   color: white;
   border: none;
   font-size: 1.8rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);
+  box-shadow: var(--kt-play-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -295,7 +348,7 @@ body {
 
 .control-btn-play:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(79, 172, 254, 0.6);
+  box-shadow: var(--kt-play-shadow-hover);
 }
 
 .control-btn-play:active {
@@ -314,13 +367,13 @@ body {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--kt-fs-bg);
   color: white;
   border: none;
   font-size: 1.3rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+  box-shadow: var(--kt-fs-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -329,7 +382,7 @@ body {
 
 .control-btn-fullscreen:hover {
   transform: scale(1.1);
-  box-shadow: 0 5px 14px rgba(102, 126, 234, 0.6);
+  box-shadow: var(--kt-fs-shadow-hover);
 }
 
 .control-btn-fullscreen:active {
@@ -348,13 +401,13 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+  background: var(--kt-skip-bg);
   color: white;
   border: none;
   font-size: 1.1rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 3px 10px rgba(255, 216, 155, 0.4);
+  box-shadow: var(--kt-skip-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -363,7 +416,7 @@ body {
 
 .control-btn-skip:hover {
   transform: scale(1.1);
-  box-shadow: 0 5px 14px rgba(255, 216, 155, 0.6);
+  box-shadow: var(--kt-skip-shadow-hover);
 }
 
 .control-btn-skip:active {
@@ -405,8 +458,8 @@ body {
   padding: 0 8px;
   border-radius: 16px;
   border: none;
-  background: #e3e8ef;
-  color: #35506b;
+  background: var(--kt-speed-bg);
+  color: var(--kt-speed-text);
   font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
@@ -415,7 +468,7 @@ body {
 }
 
 .control-btn-speed.active {
-  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  background: var(--kt-speed-active-bg);
   color: #fff;
 }
 
@@ -430,7 +483,7 @@ body {
 
 .time-display {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--kt-muted-text);
   font-weight: 600;
   min-width: 45px;
   text-align: center;
@@ -447,7 +500,7 @@ body {
   flex: 1;
   height: 18px;
   border-radius: 9px;
-  background: #ddd;
+  background: var(--kt-progress-track);
   outline: none;
   -webkit-appearance: none;
   appearance: none;
@@ -460,10 +513,10 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #4a90e2;
+  background: var(--kt-thumb);
   cursor: grab;
   transition: all 0.2s ease;
-  box-shadow: 0 3px 10px rgba(74, 144, 226, 0.5);
+  box-shadow: var(--kt-thumb-shadow);
 }
 
 .progress-slider::-webkit-slider-thumb:active {
@@ -473,19 +526,19 @@ body {
 
 .progress-slider::-webkit-slider-thumb:hover {
   transform: scale(1.2);
-  background: #357abd;
-  box-shadow: 0 3px 12px rgba(74, 144, 226, 0.6);
+  background: var(--kt-thumb-hover);
+  box-shadow: var(--kt-thumb-shadow-hover);
 }
 
 .progress-slider::-moz-range-thumb {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #4a90e2;
+  background: var(--kt-thumb);
   cursor: grab;
   border: none;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.4);
+  box-shadow: var(--kt-thumb-shadow-moz);
 }
 
 .progress-slider::-moz-range-thumb:active {
@@ -495,15 +548,15 @@ body {
 
 .progress-slider::-moz-range-thumb:hover {
   transform: scale(1.2);
-  background: #357abd;
-  box-shadow: 0 3px 12px rgba(74, 144, 226, 0.6);
+  background: var(--kt-thumb-hover);
+  box-shadow: var(--kt-thumb-shadow-hover);
 }
 
 /* Video Info */
 .video-title {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #333;
+  color: var(--kt-text);
   margin: 8px 0 4px 0;
   line-height: 1.3;
 }
@@ -517,7 +570,7 @@ body {
 
 .video-category {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--kt-muted-text);
   margin: 0;
 }
 
@@ -547,12 +600,12 @@ body {
 .grid-title {
   font-size: 1.3rem;
   font-weight: 700;
-  color: white;
+  color: var(--kt-on-bg);
 }
 
 .grid-count {
-  background: rgba(255, 255, 255, 0.25);
-  color: white;
+  background: var(--kt-on-bg-chip);
+  color: var(--kt-on-bg);
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 0.9rem;
@@ -566,8 +619,8 @@ body {
 }
 
 .video-card {
-  background: white;
-  border-radius: 16px;
+  background: var(--kt-surface);
+  border-radius: var(--kt-card-radius);
   overflow: hidden;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -584,8 +637,8 @@ body {
 }
 
 .video-card.active {
-  border: 4px solid #4a90e2;
-  box-shadow: 0 8px 24px rgba(74, 144, 226, 0.5);
+  border: 4px solid var(--kt-accent);
+  box-shadow: var(--kt-accent-shadow);
 }
 
 .video-thumbnail-wrapper {
@@ -610,7 +663,7 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(74, 144, 226, 0.95);
+  background: var(--kt-playing-bg);
   color: white;
   padding: 12px 24px;
   border-radius: 25px;
@@ -645,7 +698,7 @@ body {
   padding: 12px;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #333;
+  color: var(--kt-text);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -660,7 +713,7 @@ body {
   position: absolute;
   inset: 0;
   /* Absolute path includes the Vite `base` (/KiddieTube/) so it resolves on GitHub Pages */
-  background: rgba(165, 150, 150, 0.95) url('/KiddieTube/assets/logo_no_bg.png') center/250px no-repeat;
+  background: var(--kt-shield-bg) url('/KiddieTube/assets/logo_no_bg.png') center/250px no-repeat;
   z-index: 9998;
   display: none;
   opacity: 0;
@@ -1057,6 +1110,88 @@ body.pseudo-fullscreen .app-header {
 .pp-seg-btn.active {
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.pp-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.pp-theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid #e3e8ef;
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.pp-theme-card.active {
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+}
+
+.pp-theme-preview {
+  position: relative;
+  display: block;
+  height: 86px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pp-theme-preview-header {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 18px;
+}
+
+.pp-theme-preview-pills {
+  position: absolute;
+  top: 26px;
+  left: 8px;
+  display: flex;
+  gap: 5px;
+}
+
+.pp-theme-preview-pills span {
+  width: 26px;
+  height: 14px;
+  border-radius: 7px;
+}
+
+.pp-theme-preview-play {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.pp-theme-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #222;
+}
+
+.pp-theme-label small {
+  font-weight: 500;
+  color: #888;
+}
+
+.pp-theme-check {
+  margin-left: auto;
+  color: #4a90e2;
 }
 
 .pp-empty {

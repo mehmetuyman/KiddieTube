@@ -42,6 +42,22 @@ to gate re-opening. The panel always closes on reload.
 - **Order**: videos added from the panel are shown first, newest on top; the
   bundled videos follow in their original order.
 
+## Themes
+
+The parent panel's **Theme** tab switches the app's look: ☀️ **Sunny**
+(default), 🐳 **Ocean**, 🍭 **Candy** and 🎨 **Classic** (the original v2
+design). The choice is saved **on that device only** (`localStorage`), never
+synced through the Gist, so each device can look different.
+
+- Tokens: `--kt-*` custom properties on `:root` in `src/styles-v2.css`; their
+  defaults are the Classic design.
+- Themes: `src/themes.css` overrides the tokens per `<html data-theme="…">`.
+- List / default / persistence: `src/lib/theme.ts`. `index.html` applies the
+  saved theme before first paint (keep its id list in sync).
+
+To add a theme: add a block to `themes.css`, an entry to `THEMES` in
+`theme.ts`, and its id to the regex in `index.html`.
+
 ## Player
 
 Custom controls over the YouTube player: play/pause, ±10s, seek bar,
