@@ -185,6 +185,21 @@ function normalizeDoc(raw: any): VideoDoc {
   }
 }
 
+function addedTime(v: Video): number {
+  const t = typeof v.addedAt === 'string' ? Date.parse(v.addedAt) : NaN
+  return Number.isNaN(t) ? -Infinity : t
+}
+
+/**
+ * Display order: videos added from the parent panel first, newest on top; the
+ * bundled seed videos (no `addedAt`) follow in their original order. Only the
+ * displayed order changes - the stored list keeps insertion order.
+ */
+export function sortNewestFirst(list: Video[]): Video[] {
+  // Array.prototype.sort is stable, so equal timestamps keep their list order
+  return [...list].sort((a, b) => addedTime(b) - addedTime(a) || 0)
+}
+
 export function readCache(): VideoDoc | null {
   try {
     const raw = localStorage.getItem(LS_CACHE)

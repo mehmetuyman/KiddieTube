@@ -3,7 +3,7 @@ import VideoGrid from './components/VideoGrid'
 import YouTubeWrapper from './components/YouTubeWrapper'
 import InstallPrompt from './components/InstallPrompt'
 import ParentPanel, { requestParentAccess } from './components/ParentPanel'
-import { Video, loadVideos, LoadSource } from './lib/videoStore'
+import { Video, loadVideos, LoadSource, sortNewestFirst } from './lib/videoStore'
 
 // Category emoji mapping
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -34,7 +34,9 @@ export default function App() {
   const activeVideoIdRef = useRef<string | null>(null)
   activeVideoIdRef.current = activeVideoId
 
-  const applyList = (list: Video[]) => {
+  const applyList = (loaded: Video[]) => {
+    // newest additions on top - shared by the grid and the parent panel
+    const list = sortNewestFirst(loaded)
     setVideos(list)
     if (!activeVideoIdRef.current || !list.some(v => v.id === activeVideoIdRef.current)) {
       // the current video went away (e.g. deleted in the parent panel): cue the
