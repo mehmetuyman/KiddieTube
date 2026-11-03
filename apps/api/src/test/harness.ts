@@ -6,6 +6,7 @@ import { buildApp } from '../app.ts'
 import { loadConfig } from '../config.ts'
 import { openDb, type DbHandle } from '../db/client.ts'
 import type { Mail, Mailer } from '../email.ts'
+import type { AppContext } from '../http/context.ts'
 
 export const ADMIN_EMAIL = 'admin@example.com'
 export const PASSWORD = 'correct-horse-battery'
@@ -14,6 +15,8 @@ export interface Harness {
   app: FastifyInstance
   db: DbHandle
   outbox: Mail[]
+  /** The app's shared context (tests may swap e.g. fetchMeta). */
+  ctx: AppContext
   close(): Promise<void>
 }
 
@@ -22,14 +25,14 @@ export async function createHarness(): Promise<Harness> {
   const db = await openDb(undefined) // in-memory
   const outbox: Mail[] = []
   const mailer: Mailer = { outbox, send: async (m) => void outbox.push(m) }
-  const { app } = await buildApp({
+  const { app, ctx } = await buildApp({
     config,
     db: db.db,
     mailer,
     fetchMeta: async (id) => (id.startsWith('x') ? null : { title: `Title of ${id}`, channel: 'Stub Channel' }),
   })
   await app.ready()
-  return { app, db, outbox, close: async () => (await app.close(), await db.close()) }
+  return { app, db, outbox, ctx, close: async () => (await app.close(), await db.close()) }
 }
 
 /** A signed-in client: keeps the session cookie between requests. */
@@ -58,25 +61,28 @@ export class Client {
     return { status: res.statusCode, body: res.body ? safeJson(res.body) : null, headers: res.headers }
   }
 
-  /** Sign up and, when accepted, open the confirmation link from the email (which signs in). */
+  /** Start an account (no password), then finish it from the emailed link and sign in. */
   async signUp(email: string, name = email.split('@')[0]) {
-    const r = await this.req('POST', '/api/auth/sign-up/email', { email, password: PASSWORD, name })
+    const r = await this.req('POST', '/api/v1/signup', { email, name })
     if (r.status === 200) {
-      const link = this.h.outbox.findLast((m) => m.to === email && /verify-email/.test(m.text))
-      if (!link) throw new Error(`no confirmation email for ${email}`)
-      await this.verify(link.text)
+      await this.finishFromEmail(email)
+      await this.signIn(email)
     }
     return r
   }
-  /** Open the confirmation link found in an email body. */
-  async verify(text: string) {
-    const url = new URL(/https?:\/\/\S+verify-email\S+/.exec(text)![0])
-    return this.req('GET', url.pathname + url.search)
+  /** Choose the password through the newest "choose your password" link sent to `email`. */
+  async finishFromEmail(email: string, password = PASSWORD) {
+    const mail = this.h.outbox.findLast((m) => m.to === email && /\/reset-password\//.test(m.text))
+    if (!mail) throw new Error(`no password link for ${email}`)
+    return this.req('POST', '/api/auth/reset-password', { token: tokenFrom(mail.text), newPassword: password })
   }
   signIn(email: string, password = PASSWORD) {
     return this.req('POST', '/api/auth/sign-in/email', { email, password })
   }
 }
+
+/** The token in an emailed /api/auth/reset-password/<token> link. */
+export const tokenFrom = (text: string) => /\/reset-password\/([A-Za-z0-9_-]+)/.exec(text)![1]
 
 const safeJson = (s: string) => {
   try {

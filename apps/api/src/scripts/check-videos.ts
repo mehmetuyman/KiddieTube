@@ -12,7 +12,7 @@
 // where too many videos suddenly look unavailable is treated as a YouTube
 // problem: nothing is written and the run fails loudly [review M4].
 import { parseArgs } from 'node:util'
-import { eq } from 'drizzle-orm'
+import { and, eq, lt } from 'drizzle-orm'
 import { loadConfig } from '../config.ts'
 import { openDb, type Db } from '../db/client.ts'
 import { withFamily, withSystem } from '../db/context.ts'
@@ -99,6 +99,20 @@ export async function checkAllVideos(
   return summary
 }
 
+/**
+ * Remove accounts whose password was never chosen from the emailed link
+ * (started sign-ups that were never finished), once they're a week old.
+ * They can't sign in and hold nothing; signing up again just starts over.
+ */
+export async function pruneUnfinishedAccounts(db: Db, olderThanMs = 7 * 24 * 3600 * 1000): Promise<number> {
+  const cutoff = new Date(Date.now() - olderThanMs)
+  const gone = await db
+    .delete(s.user)
+    .where(and(eq(s.user.emailVerified, false), lt(s.user.createdAt, cutoff)))
+    .returning({ id: s.user.id })
+  return gone.length
+}
+
 if (process.argv[1] && /check-videos\.ts$/.test(process.argv[1])) {
   const { values } = parseArgs({ options: { 'dry-run': { type: 'boolean' } } })
   const config = loadConfig()
@@ -112,6 +126,10 @@ if (process.argv[1] && /check-videos\.ts$/.test(process.argv[1])) {
       console.log(
         `Checked ${r.checked} videos: ${r.nowUnavailable} became unavailable, ${r.restored} restored, ${r.unknown} could not be checked${values['dry-run'] ? ' (dry run)' : ''}.`,
       )
+    }
+    if (!values['dry-run']) {
+      const pruned = await pruneUnfinishedAccounts(handle.db)
+      if (pruned) console.log(`Removed ${pruned} unfinished sign-up(s) older than a week.`)
     }
   } finally {
     await handle.close()

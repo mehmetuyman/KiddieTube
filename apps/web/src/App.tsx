@@ -10,7 +10,14 @@ import { applyTheme, hasSavedTheme } from './lib/theme'
 import { htmlLang, t } from './lib/i18n'
 import type { Category, Feed } from '@kiddietube/shared'
 import { SERVER_MODE } from './server/mode'
-import { devicePinIsSet, getPairing, startFeedSync, verifyPinWithDevice } from './server/device'
+import {
+  devicePinIsSet,
+  endParentSessionOnKidsDevice,
+  getPairing,
+  parentSessionEnded,
+  startFeedSync,
+  verifyPinWithDevice,
+} from './server/device'
 import { ApiRequestError } from './server/api'
 import { navigate, usePath } from './router'
 import UpdateBanner from './components/UpdateBanner'
@@ -119,6 +126,11 @@ function KidsPage() {
     setActiveCategory(cat => (cat === 'All' || shown.some(v => v.category === cat) ? cat : 'All'))
   }
 
+  // a parent session never stays on a kid's device [review R2-1]
+  useEffect(() => {
+    if (SERVER_MODE) endParentSessionOnKidsDevice()
+  }, [])
+
   useEffect(() => {
     if (SERVER_MODE) {
       // offline-first: stored feed now, server check in the background
@@ -204,7 +216,7 @@ function KidsPage() {
    * Server mode: PIN-gate the parent console on a paired device. Fails
    * closed: the console opens only after the server confirms there is no PIN
    * or that the PIN is right [review K1]. (The console also needs a parent
-   * sign-in, which pairing ends on the kid's device [review K2].)
+   * sign-in, which never stays on a kid's device [review K2, R2-1].)
    */
   async function openParentConsole() {
     if (!getPairing()) return navigate('/parent')
@@ -218,6 +230,7 @@ function KidsPage() {
       if (e instanceof ApiRequestError && e.status === 429) return void window.alert(e.message)
       return void window.alert(e instanceof ApiRequestError && e.offline ? t.parentOffline : t.parentError)
     }
+    await parentSessionEnded() // the console then asks for a parent sign-in
     navigate('/parent')
   }
 

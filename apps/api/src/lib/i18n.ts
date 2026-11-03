@@ -19,6 +19,9 @@ export function langOf(h: HeaderBag | undefined | null): Lang {
   return header(h, 'accept-language').toLowerCase().startsWith('tr') ? 'tr' : 'en'
 }
 
+/** Sign-in to an account whose password was never chosen from the emailed link. */
+export const NOT_FINISHED = 'This account isn’t finished yet. Choose your password with the link in your email, or sign up again to get a new link.'
+
 /** Shown when sign-up is refused by the invite-only rule. */
 export const INVITE_ONLY = 'This email can’t register. Use the exact address the invitation was sent to.'
 
@@ -70,7 +73,7 @@ const TR: Record<string, string> = {
   'User already exists.': 'Bu e-posta ile zaten bir hesap var.',
   'User already exists. Use another email.': 'Bu e-posta ile zaten bir hesap var.',
   'User not found': 'Kullanıcı bulunamadı.',
-  'Email not verified': 'E-posta adresiniz henüz onaylanmadı. Size yeni bir onay bağlantısı gönderdik.',
+  [NOT_FINISHED]: 'Bu hesap henüz tamamlanmadı. E-postanızdaki bağlantıyla şifrenizi belirleyin ya da yeni bir bağlantı için yeniden kaydolun.',
   'Nothing to update': 'Değiştirilecek bir şey yok.',
   [INVITE_ONLY]: 'Bu e-posta kayıt olamaz. Davetin gönderildiği adresi tam olarak kullanın.',
 }

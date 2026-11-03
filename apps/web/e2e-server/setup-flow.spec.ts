@@ -1,12 +1,21 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '../e2e/fixtures'
 
-/** Open the newest confirmation link sent to `email` (dev outbox of the test API). */
-async function confirmEmail(page: Page, email: string) {
+/**
+ * Open the newest "choose your password" link sent to `email` (dev outbox of
+ * the test API), choose the password, and sign in on the page it leads to.
+ */
+async function finishFromEmail(page: Page, email: string) {
   const mails: { to: string; text: string }[] = await (await page.request.get('./api/v1/dev/outbox')).json()
-  const mail = mails.filter((m) => m.to === email && /verify-email/.test(m.text)).pop()
-  expect(mail, `confirmation email for ${email}`).toBeTruthy()
-  await page.goto(/https?:\/\/\S+verify-email\S+/.exec(mail!.text)![0])
+  const mail = mails.filter((m) => m.to === email && /reset-password/.test(m.text)).pop()
+  expect(mail, `password link for ${email}`).toBeTruthy()
+  await page.goto(/https?:\/\/\S+reset-password\S+/.exec(mail!.text)![0])
+  await page.getByLabel('Password (at least 10 characters)').fill('correct-horse-battery')
+  await page.getByRole('button', { name: 'Save password' }).click()
+  await expect(page.getByText('Password saved')).toBeVisible()
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Password', { exact: true }).fill('correct-horse-battery')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 }
 
 async function signIn(page: Page, email: string) {
@@ -26,10 +35,9 @@ test('admin creates a family, adds content, pairs a device; the kids page works 
   await page.goto('./join')
   await page.getByLabel('Your name').fill('Admin')
   await page.getByLabel(/^Email/).fill('admin@example.com')
-  await page.getByLabel(/^Password/).fill('correct-horse-battery')
-  await page.getByRole('button', { name: 'Create account' }).click()
+  await page.getByRole('button', { name: 'Send me the link' }).click()
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
-  await confirmEmail(page, 'admin@example.com') // signs in, back to /join, on to the console
+  await finishFromEmail(page, 'admin@example.com') // password from the email link, then back to /join and on
 
   // 2. Create a family: it starts empty
   await page.getByLabel('Family name').fill('Test Family')
@@ -81,11 +89,23 @@ test('admin creates a family, adds content, pairs a device; the kids page works 
   await page.goto('./?parent=1')
   await expect.poll(() => dialogs).toEqual(['prompt:Parent PIN', 'alert:Wrong PIN'])
   await expect(page.locator('.video-card-title')).toHaveText(['Video aaaaaaaaaaa'])
+  // ...and the right PIN leads to the parent SIGN-IN: visiting the kids' page
+  // ended the parent session on this device [review R2-1]
   promptAnswer = '2468'
   await page.goto('./?parent=1')
+  await expect(page.getByRole('heading', { name: 'Parent sign-in' })).toBeVisible()
+
+  // A parent who signs in on the kid's device is signed out again as soon as
+  // they go back to the kids' page [review R2-1]
+  await signIn(page, 'admin@example.com')
   await expect(page.locator('.pc-nav')).toBeVisible()
-  await page.goto('./')
+  const signedOut = page.waitForResponse('**/api/auth/sign-out')
+  await page.getByRole('button', { name: '← Kids’ view' }).click()
+  await signedOut
   await expect(page.locator('.video-card-title')).toHaveText(['Video aaaaaaaaaaa'])
+  await page.goto('./parent')
+  await expect(page.getByRole('heading', { name: 'Parent sign-in' })).toBeVisible()
+  await page.goto('./')
   await expect(page.locator('.category-pill .category-name')).toHaveText(['All', 'Songs'])
 
   // 7. Server unreachable (home server unplugged): still works from the device's copy
@@ -110,8 +130,7 @@ test('an uninvited email cannot create an account', async ({ page }) => {
   await page.goto('./join')
   await page.getByLabel('Your name').fill('Stranger')
   await page.getByLabel(/^Email/).fill('stranger@example.com')
-  await page.getByLabel(/^Password/).fill('correct-horse-battery')
-  await page.getByRole('button', { name: 'Create account' }).click()
+  await page.getByRole('button', { name: 'Send me the link' }).click()
   await expect(page.locator('.pp-error')).toBeVisible()
   await expect(page.getByLabel('Family name')).toHaveCount(0)
 })
@@ -123,8 +142,7 @@ test.describe('Turkish device', () => {
     await page.goto('./join')
     await page.getByLabel('Adınız').fill('Yabancı')
     await page.getByLabel(/^E-posta/).fill('yabanci@example.com')
-    await page.getByLabel(/^Şifre/).fill('correct-horse-battery')
-    await page.getByRole('button', { name: 'Hesap oluştur' }).click()
+    await page.getByRole('button', { name: 'Bağlantıyı gönder' }).click()
     await expect(page.locator('.pp-error')).toHaveText('Bu e-posta kayıt olamaz. Davetin gönderildiği adresi tam olarak kullanın.')
 
     await page.goto('./parent')

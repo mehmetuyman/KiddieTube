@@ -71,9 +71,11 @@ export const api = {
 /** Better Auth endpoints (/api/auth/*). */
 export const authApi = {
   signIn: (email: string, password: string) => request('POST', '/api/auth/sign-in/email', { email, password }),
-  /** The confirmation email links back to `callbackPath` (relative to the base). */
-  signUp: (email: string, password: string, name: string, callbackPath: string) =>
-    request('POST', '/api/auth/sign-up/email', { email, password, name, callbackURL: `${base}${callbackPath}` }),
+  /**
+   * Start an account: no password here. The email has a "choose your
+   * password" link that leads back to `next` (a path in this app).
+   */
+  signUp: (email: string, name: string, next: string) => request('POST', `${API_PREFIX}/signup`, { email, name, next }),
   signOut: () => request('POST', '/api/auth/sign-out', {}),
   requestReset: (email: string) =>
     request('POST', '/api/auth/request-password-reset', { email, redirectTo: `${base}/reset-password` }),

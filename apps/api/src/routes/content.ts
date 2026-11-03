@@ -27,7 +27,7 @@ import {
 } from '@kiddietube/shared'
 import { withFamily, type Tx } from '../db/context.ts'
 import * as s from '../db/schema.ts'
-import { badRequest, conflict, notFound, tooMany } from '../http/errors.ts'
+import { HttpError, badRequest, conflict, notFound, tooMany } from '../http/errors.ts'
 import { requireDevice, requireMember, touch, type AppContext } from '../http/context.ts'
 import { hashPin, newId, newSecret, sha256, verifyPinHash } from '../lib/crypto.ts'
 
@@ -237,6 +237,12 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
     await withFamily(ctx.db, familyId, (tx) => assertCategories(tx, [body.categoryId]))
     const lang = langOf(req.headers)
     const fail = (url: string, message: string) => ({ url, ok: false as const, error: translate(message, lang) })
+    // Only our own messages reach the parent; anything else is logged [review R2-3].
+    const failWith = (url: string, e: unknown) => {
+      if (e instanceof HttpError) return fail(url, e.message)
+      req.log.error({ err: e }, 'video import failed')
+      return fail(url, 'Something went wrong')
+    }
 
     // Same link pasted twice: report it once.
     const urls = [...new Set(body.urls)]
@@ -253,7 +259,7 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
       try {
         return { url, ok: true as const, v: await prepareVideo(youtubeId) }
       } catch (e) {
-        return fail(url, (e as Error).message)
+        return failWith(url, e)
       }
     })
 
@@ -272,7 +278,7 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
         })
         results.push({ url: p.url, ok: true, video: toVideo(r) })
       } catch (e) {
-        results.push(fail(p.url, (e as Error).message))
+        results.push(failWith(p.url, e))
       }
     }
     return { results }

@@ -32,6 +32,7 @@ export default defineConfig({
         BASE_URL: WEB,
         ADMIN_EMAILS: 'admin@example.com',
         FAKE_YOUTUBE_META: 'true',
+        DEV_OUTBOX: 'true', // the tests follow the emailed links
         LOG_LEVEL: 'warn',
       },
       url: `http://127.0.0.1:${API_PORT}/api/v1/health`,

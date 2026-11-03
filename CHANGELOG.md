@@ -49,6 +49,17 @@ The GitHub Pages build keeps working as before.
     single-escaped emails, no inline script (CSP), dedicated service user,
     and more.
   - Deploy: `.env` is no longer sourced by bash (K3); restore notes (L7).
+- **Review round 2** (`docs/CODE_REVIEW_2026-11-03_multi-family_round2.md`):
+  - On a kid's device every return to the kids' page signs the parent out
+    (R2-1).
+  - Sign-up takes no password: the password is chosen from the emailed link,
+    so nobody can register someone else's address with a password they know
+    (R2-4, stronger than the suggested fix). Unfinished sign-ups are removed
+    after a week.
+  - The dev outbox needs `DEV_OUTBOX=true` (refused in production) and answers
+    only this machine (R2-2).
+  - Import shows only our own error messages (R2-3); deploy and comment nits
+    (R2-5, R2-6).
 - **Turkish and English everywhere,** chosen per device (defaults to the
   device language; switchable in the console header, Settings, and the
   on-device panel's Theme tab): kids' page, parent console, on-device parent

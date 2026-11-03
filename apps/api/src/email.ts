@@ -45,29 +45,27 @@ ${cta ? `<p><a href="${esc(cta.url)}" style="display:inline-block;background:#ff
 }
 
 export const emails = {
-  verifyEmail(to: string, url: string, lang: Lang = 'en'): Mail {
+  finishSignUp(to: string, url: string, lang: Lang = 'en'): Mail {
     if (lang === 'tr')
       return {
         to,
-        subject: 'Kiddie Tube e-posta adresinizi onaylayın',
-        text: `Kiddie Tube hesabınızı tamamlamak için e-posta adresinizi onaylayın (24 saat geçerli): ${url}
-Bu hesabı siz açmadıysanız bu e-postayı yok sayın.`,
+        subject: 'Kiddie Tube hesabınızı tamamlayın',
+        text: `Kiddie Tube hesabınızı tamamlamak için şifrenizi belirleyin (1 saat geçerli): ${url}\nBu hesabı siz istemediyseniz bu e-postayı yok sayın.`,
         html: layout(
-          'E-posta adresinizi onaylayın',
-          'Kiddie Tube hesabınızı tamamlamak için e-posta adresinizi onaylayın. Bağlantı 24 saat geçerlidir. Bu hesabı siz açmadıysanız bu e-postayı yok sayın.',
-          { label: 'E-postamı onayla', url },
+          'Hesabınızı tamamlayın',
+          'Kiddie Tube hesabınızı tamamlamak için şifrenizi belirleyin. Bağlantı 1 saat geçerlidir. Bu hesabı siz istemediyseniz bu e-postayı yok sayın.',
+          { label: 'Şifremi belirle', url },
           lang,
         ),
       }
     return {
       to,
-      subject: 'Confirm your Kiddie Tube email',
-      text: `Confirm your email address to finish setting up your Kiddie Tube account (valid for 24 hours): ${url}
-If you didn't create this account, ignore this email.`,
+      subject: 'Finish your Kiddie Tube account',
+      text: `Choose your password to finish your Kiddie Tube account (valid for 1 hour): ${url}\nIf you didn't ask for this, ignore this email.`,
       html: layout(
-        'Confirm your email',
-        'Confirm your email address to finish setting up your Kiddie Tube account. The link is valid for 24 hours. If you didn’t create this account, ignore this email.',
-        { label: 'Confirm my email', url },
+        'Finish your account',
+        'Choose your password to finish your Kiddie Tube account. The link is valid for 1 hour. If you didn’t ask for this, ignore this email.',
+        { label: 'Choose my password', url },
       ),
     }
   },

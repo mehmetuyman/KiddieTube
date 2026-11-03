@@ -25,5 +25,7 @@ describe('config', () => {
     expect(() => loadConfig({ ...prod, DATABASE_URL: undefined } as unknown as NodeJS.ProcessEnv)).toThrow(/DATABASE_URL/)
     expect(() => loadConfig({ ...prod, AUTH_SECRET: undefined } as unknown as NodeJS.ProcessEnv)).toThrow(/AUTH_SECRET/)
     expect(() => loadConfig({ ...prod, FAKE_YOUTUBE_META: 'true' } as NodeJS.ProcessEnv)).toThrow(/FAKE_YOUTUBE_META/)
+    expect(() => loadConfig({ ...prod, DEV_OUTBOX: 'true' } as NodeJS.ProcessEnv)).toThrow(/DEV_OUTBOX/)
+    expect(loadConfig({} as NodeJS.ProcessEnv).DEV_OUTBOX).toBe(false)
   })
 })

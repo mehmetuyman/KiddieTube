@@ -82,7 +82,25 @@ export async function syncFeed(timeoutMs = 4000): Promise<{ result: SyncResult; 
   }
 }
 
-/** Ask the server whether `pin` is this family's parent PIN (via the device key). */
+let parentSessionEnding: Promise<void> = Promise.resolve()
+
+/**
+ * On a kid's (paired) device a parent session must not outlive the console
+ * visit [review R2-1]: every way back to the kids' page (Kids view, the logo,
+ * reload, back button, reopening the app) ends it. A no-op without a session.
+ * If the server can't be reached, the next visit to the kids' page tries again.
+ */
+export function endParentSessionOnKidsDevice(): void {
+  if (!getPairing()) return
+  parentSessionEnding = request('POST', '/api/auth/sign-out', {}).then(
+    () => undefined,
+    () => undefined,
+  )
+}
+
+/** Resolves once the sign-out started above has finished. */
+export const parentSessionEnded = () => parentSessionEnding
+
 /**
  * Retire a pairing on the server (a signed-in parent of that family is
  * needed). Best effort: a 404 (already gone) or a family the parent isn't in
@@ -102,6 +120,7 @@ export async function devicePinIsSet(): Promise<boolean> {
   return r.set
 }
 
+/** Ask the server whether `pin` is this family's parent PIN (via the device key). */
 export async function verifyPinWithDevice(pin: string): Promise<boolean> {
   const p = getPairing()
   if (!p) return true

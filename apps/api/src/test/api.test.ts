@@ -398,16 +398,11 @@ describe('language', () => {
     const wrong = await new Client(h).req('POST', '/api/auth/sign-in/email', { email: ADMIN_EMAIL, password: 'wrong-password-1' }, TR)
     expect(wrong.status).toBe(401)
     expect(wrong.body.message).toBe('E-posta ya da şifre yanlış.')
-    const stranger = await new Client(h).req(
-      'POST',
-      '/api/auth/sign-up/email',
-      { email: 'nobody@example.com', password: 'long-enough-pass', name: 'X' },
-      TR,
-    )
-    expect(stranger.status).toBeGreaterThanOrEqual(400)
-    expect(stranger.body.message).toBe('Bu e-posta kayıt olamaz. Davetin gönderildiği adresi tam olarak kullanın.')
+    const stranger = await new Client(h).req('POST', '/api/v1/signup', { email: 'nobody@example.com', name: 'X' }, TR)
+    expect(stranger.status).toBe(403)
+    expect(stranger.body.error.message).toBe('Bu e-posta kayıt olamaz. Davetin gönderildiği adresi tam olarak kullanın.')
     const strangerEn = await new Client(h).signUp('nobody2@example.com')
-    expect(strangerEn.body.message).toBe('This email can’t register. Use the exact address the invitation was sent to.')
+    expect(strangerEn.body.error.message).toBe('This email can’t register. Use the exact address the invitation was sent to.')
   })
 
   it('sends invitation and password-reset emails in the sender’s language', async () => {
@@ -428,20 +423,54 @@ describe('language', () => {
 describe('review fixes', () => {
   const ids = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => (prefix + String(i).padStart(2, '0')).padEnd(11, 'x'))
 
-  it('[H1] an unconfirmed email cannot sign in, and an admin address only counts once confirmed', async () => {
+  it('[H1, R2-4] the password is chosen only through the emailed link; a squatter gains nothing and blocks nothing', async () => {
     const admin = new Client(h)
     await admin.signIn(ADMIN_EMAIL)
     await admin.req('POST', '/api/v1/admin/family-invites', { email: 'slow@example.com' })
-    const slow = new Client(h)
-    const su = await slow.req('POST', '/api/auth/sign-up/email', { email: 'slow@example.com', password: 'correct-horse-battery', name: 'Slow' })
-    expect(su.status).toBe(200)
-    expect((await slow.req('GET', '/api/v1/me')).status).toBe(401) // no session before confirming
-    const si = await slow.signIn('slow@example.com')
-    expect(si.status).toBe(403)
-    expect(si.body.code).toBe('EMAIL_NOT_VERIFIED')
-    const link = h.outbox.findLast((m) => m.to === 'slow@example.com' && /verify-email/.test(m.text))!
-    await slow.verify(link.text)
-    expect((await slow.req('GET', '/api/v1/me')).body.user).toMatchObject({ email: 'slow@example.com', isAdmin: false })
+
+    // Better Auth's own sign-up (which takes a password) is closed
+    const direct = await new Client(h).req('POST', '/api/auth/sign-up/email', { email: 'slow@example.com', password: 'squatter-password', name: 'S' })
+    expect(direct.status).toBe(404)
+
+    // Someone registers the invited address first: no password is set, nothing to sign in with
+    const squatter = new Client(h)
+    expect((await squatter.req('POST', '/api/v1/signup', { email: 'slow@example.com', name: 'Squatter' })).status).toBe(200)
+    const mail = h.outbox.findLast((m) => m.to === 'slow@example.com')!
+    expect(mail.subject).toBe('Finish your Kiddie Tube account')
+    const si = await squatter.signIn('slow@example.com', 'squatter-password')
+    expect(si.status).toBe(401)
+
+    // The real owner signs up too (no "already exists") and finishes from their inbox
+    const owner = new Client(h)
+    expect((await owner.req('POST', '/api/v1/signup', { email: 'slow@example.com', name: 'Slow' })).status).toBe(200)
+    expect((await owner.finishFromEmail('slow@example.com')).status).toBe(200)
+    expect((await owner.signIn('slow@example.com')).status).toBe(200)
+    expect((await owner.req('GET', '/api/v1/me')).body.user).toMatchObject({ email: 'slow@example.com', isAdmin: false })
+
+    // An account whose password was never chosen can't sign in
+    await admin.req('POST', '/api/v1/admin/family-invites', { email: 'never@example.com' })
+    await new Client(h).req('POST', '/api/v1/signup', { email: 'never@example.com', name: 'N' })
+    const unfinished = await new Client(h).signIn('never@example.com', 'any-guess-at-all')
+    expect(unfinished.status).toBeGreaterThanOrEqual(401)
+  })
+
+  it('[R2-3] import shows only our own messages, never raw database errors', async () => {
+    const c = new Client(h)
+    await c.signIn(ADMIN_EMAIL)
+    const fam = (await c.req('POST', '/api/v1/families', { name: 'Raw Family' })).body.id
+    const cat = (await c.req('POST', `/api/v1/families/${fam}/categories`, { name: 'Gone', emoji: '🎵' })).body.id
+    const original = h.ctx.fetchMeta
+    // the category is deleted by another parent while the links are looked up
+    h.ctx.fetchMeta = async (id) => {
+      await c.req('DELETE', `/api/v1/families/${fam}/categories/${cat}`)
+      return { title: `Video ${id}`, channel: 'C' }
+    }
+    try {
+      const r = await c.req('POST', `/api/v1/families/${fam}/videos/import`, { urls: ['rawrawraw01'], categoryId: cat })
+      expect(r.body.results[0]).toEqual({ url: 'rawrawraw01', ok: false, error: 'Something went wrong' })
+    } finally {
+      h.ctx.fetchMeta = original
+    }
   })
 
   it('[K1] a paired device can ask whether a PIN is set', async () => {
@@ -528,5 +557,19 @@ describe('review fixes', () => {
     const mail = h.outbox.findLast((m) => m.to === 'amp@example.com')!
     expect(mail.html).toContain('Join Ali &#38; Ayşe')
     expect(mail.html).not.toContain('&#38;#38;')
+  })
+})
+
+describe('unfinished sign-ups', () => {
+  it('[R2-4] are removed after a week by the nightly job; finished accounts stay', async () => {
+    const { pruneUnfinishedAccounts } = await import('../scripts/check-videos.ts')
+    const admin = new Client(h)
+    await admin.signIn(ADMIN_EMAIL)
+    await admin.req('POST', '/api/v1/admin/family-invites', { email: 'stale@example.com' })
+    await new Client(h).req('POST', '/api/v1/signup', { email: 'stale@example.com', name: 'Stale' })
+    expect(await pruneUnfinishedAccounts(h.db.db)).toBe(0) // not a week old yet
+    const removed = await pruneUnfinishedAccounts(h.db.db, -1000) // "older than now + 1s": every unfinished one
+    expect(removed).toBeGreaterThan(0)
+    expect((await admin.req('GET', '/api/v1/me')).status).toBe(200)
   })
 })

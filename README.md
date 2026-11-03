@@ -45,13 +45,16 @@ The self-hosted version (`kids.tinyapps.dev`) is the same web app built with
 (the API uses an embedded PostgreSQL, PGlite, so nothing to install):
 
 ```bash
-ADMIN_EMAILS=you@example.com FAKE_YOUTUBE_META=true npm run dev -w @kiddietube/api   # :3007, data in apps/api/.data/dev
+ADMIN_EMAILS=you@example.com FAKE_YOUTUBE_META=true DEV_OUTBOX=true npm run dev -w @kiddietube/api   # :3007, data in apps/api/.data/dev
 VITE_SERVER_MODE=true BASE_PATH=/ npm run dev -w @kiddietube/web                    # proxies /api to :3007
 ```
 
-Open `/join` to create the first (admin) account, create a family, add
-categories/videos, then **Kids → Use this device**. Without
-`RESEND_API_KEY`, emails (invites, password resets) are printed to the API log.
+Open `/join` to create the first (admin) account. Sign-up asks only for name
+and email; the password is chosen from the emailed link. Without
+`RESEND_API_KEY`, emails are printed to the API log (and, with
+`DEV_OUTBOX=true`, listed at `/api/v1/dev/outbox` for requests from this
+machine). Then create a family, add categories/videos, and **Kids → Use this
+device**.
 
 ```bash
 npm test -w @kiddietube/api       # API integration tests (PGlite, RLS enforced)

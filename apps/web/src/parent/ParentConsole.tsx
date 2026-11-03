@@ -46,7 +46,7 @@ export default function ParentConsole() {
   }, [loadMe])
 
   // Landing pages from email links work signed-out too
-  if (path.startsWith('/reset-password')) return <Shell><ResetPassword /></Shell>
+  if (path.startsWith('/reset-password')) return <Shell><ResetPassword onDone={loadMe} /></Shell>
   if (path.startsWith('/join')) return <Shell><Join me={me} onDone={loadMe} /></Shell>
   if (path.startsWith('/accept')) return <Shell><AcceptInvite me={me} onDone={loadMe} /></Shell>
 
@@ -304,14 +304,14 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
 }
 
 /**
- * Create an account. The email address is confirmed first: the link in the
- * confirmation email signs them in and brings them back to this page.
+ * Start an account: name and email only. The password is chosen from the
+ * link in the email (so only the owner of the address can set it), which
+ * then brings them back to this page [review R2-4].
  */
 function SignUpForm({ email: presetEmail, title }: { email?: string; title: string }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState(presetEmail ?? '')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(query('error') ? c.confirmLinkInvalid : null)
+  const [error, setError] = useState<string | null>(null)
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const submit = async (e: FormEvent) => {
@@ -319,7 +319,7 @@ function SignUpForm({ email: presetEmail, title }: { email?: string; title: stri
     setBusy(true)
     setError(null)
     try {
-      await authApi.signUp(email, password, name, here().replace(/[?&]error=[^&]*/, ''))
+      await authApi.signUp(email, name, here())
       setSentTo(email)
     } catch (err) {
       setError(errorText(err))
@@ -345,18 +345,6 @@ function SignUpForm({ email: presetEmail, title }: { email?: string; title: stri
       <label className="pp-field">
         <span>{c.inviteEmail}</span>
         <input className="pp-input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      </label>
-      <label className="pp-field">
-        <span>{c.passwordMin}</span>
-        <input
-          className="pp-input"
-          type="password"
-          autoComplete="new-password"
-          minLength={10}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
       </label>
       <button className="pp-btn pp-btn-primary" disabled={busy}>
         {busy ? c.creatingAccount : c.createAccount}
@@ -422,8 +410,11 @@ function AcceptInvite({ me, onDone }: { me: Me | null | undefined; onDone: () =>
   )
 }
 
-/** /reset-password?token=…  — choose a new password from the email link. */
-function ResetPassword() {
+/**
+ * /reset-password?token=…[&next=…] — choose a password from the email link
+ * (a reset, or finishing a new account), then sign in and go on to `next`.
+ */
+function ResetPassword({ onDone }: { onDone: () => Promise<void> }) {
   const token = query('token') ?? ''
   const [password, setPassword] = useState('')
   const [done, setDone] = useState(false)
@@ -439,12 +430,10 @@ function ResetPassword() {
   }
   if (done)
     return (
-      <div className="pp-form">
+      <>
         <div className="pp-notice">{c.passwordChanged}</div>
-        <button className="pp-btn pp-btn-primary" onClick={() => navigate('/parent', { replace: true })}>
-          {c.signIn}
-        </button>
-      </div>
+        <SignIn onDone={onDone} />
+      </>
     )
   return (
     <form onSubmit={submit} className="pp-form">

@@ -54,7 +54,7 @@ log "Web app built"
 # .env is NOT sourced by bash: values such as `Kiddie Tube <noreply@...>` are
 # fine for systemd and Node but are shell syntax [review K3]. Read only the
 # one value the shell needs; Node reads the file itself (--env-file).
-DATABASE_URL=$(grep -E '^DATABASE_URL=' "$APP/.env" | tail -n 1 | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/')
+DATABASE_URL=$(grep -E '^DATABASE_URL=' "$APP/.env" | tail -n 1 | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/' || true)
 [ -n "$DATABASE_URL" ] || { log "DATABASE_URL missing in $APP/.env"; false; }
 # Migrations only go forward: keep a restorable copy from just before them
 # (deploy/README.md "Restore" says how to use it).

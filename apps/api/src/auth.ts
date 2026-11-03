@@ -5,6 +5,13 @@
 // Sign-up is invite-only: an email may register only if it is an instance
 // admin (ADMIN_EMAILS), has an unused family invite, or has a pending
 // invitation into an existing family.
+//
+// Sign-up never takes a password [review R2-4]. POST /api/v1/signup creates
+// the account with a random password nobody knows and emails a "choose your
+// password" link (Better Auth's reset flow). Choosing it proves the address,
+// which marks it confirmed; unconfirmed accounts can't sign in. So whoever
+// owns the inbox always sets the password, and someone who registers another
+// person's address first gains nothing and blocks nothing.
 import { betterAuth } from 'better-auth'
 import { langOf } from './lib/i18n.ts'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
@@ -15,40 +22,39 @@ import { withSystem } from './db/context.ts'
 import * as schema from './db/schema.ts'
 import { emails, type Mailer } from './email.ts'
 
+/** May this email create an account? (instance admin, unused family invite, or pending invitation) */
+export async function mayRegister(db: Db, config: Config, email: string): Promise<boolean> {
+  if (isInstanceAdmin(config, email)) return true
+  const now = new Date()
+  return withSystem(db, async (tx) => {
+    const fi = await tx
+      .select({ id: schema.familyInvite.id })
+      .from(schema.familyInvite)
+      .where(
+        and(
+          eq(schema.familyInvite.email, email.toLowerCase()),
+          isNull(schema.familyInvite.usedAt),
+          gt(schema.familyInvite.expiresAt, now),
+        ),
+      )
+      .limit(1)
+    if (fi.length) return true
+    const mi = await tx
+      .select({ id: schema.invitation.id })
+      .from(schema.invitation)
+      .where(
+        and(
+          eq(schema.invitation.email, email.toLowerCase()),
+          eq(schema.invitation.status, 'pending'),
+          gt(schema.invitation.expiresAt, now),
+        ),
+      )
+      .limit(1)
+    return mi.length > 0
+  })
+}
+
 export function createAuth(db: Db, config: Config, mailer: Mailer) {
-  const isAdminEmail = (email: string) => isInstanceAdmin(config, email)
-
-  async function mayRegister(email: string): Promise<boolean> {
-    if (isAdminEmail(email)) return true
-    const now = new Date()
-    return withSystem(db, async (tx) => {
-      const fi = await tx
-        .select({ id: schema.familyInvite.id })
-        .from(schema.familyInvite)
-        .where(
-          and(
-            eq(schema.familyInvite.email, email.toLowerCase()),
-            isNull(schema.familyInvite.usedAt),
-            gt(schema.familyInvite.expiresAt, now),
-          ),
-        )
-        .limit(1)
-      if (fi.length) return true
-      const mi = await tx
-        .select({ id: schema.invitation.id })
-        .from(schema.invitation)
-        .where(
-          and(
-            eq(schema.invitation.email, email.toLowerCase()),
-            eq(schema.invitation.status, 'pending'),
-            gt(schema.invitation.expiresAt, now),
-          ),
-        )
-        .limit(1)
-      return mi.length > 0
-    })
-  }
-
   return betterAuth({
     appName: 'Kiddie Tube',
     baseURL: config.BASE_URL,
@@ -68,23 +74,20 @@ export function createAuth(db: Db, config: Config, mailer: Mailer) {
       enabled: true,
       minPasswordLength: 10,
       maxPasswordLength: 128,
-      // The address must be proven before the account can sign in, so nobody
-      // can claim the admin's or an invited parent's email [review H1].
+      // The address must be proven (by choosing the password from the emailed
+      // link) before the account can sign in [review H1, R2-4].
       requireEmailVerification: true,
       autoSignIn: false,
       resetPasswordTokenExpiresIn: 60 * 60,
       revokeSessionsOnPasswordReset: true,
+      // The same link serves both: finishing a new account, or a reset.
       sendResetPassword: async ({ user, url }, request) => {
-        await mailer.send(emails.passwordReset(user.email, url, langOf(request?.headers)))
+        const lang = langOf(request?.headers)
+        await mailer.send(user.emailVerified ? emails.passwordReset(user.email, url, lang) : emails.finishSignUp(user.email, url, lang))
       },
-    },
-    emailVerification: {
-      sendOnSignUp: true,
-      sendOnSignIn: true, // signing in unverified re-sends the link
-      autoSignInAfterVerification: true,
-      expiresIn: 60 * 60 * 24, // 1 day
-      sendVerificationEmail: async ({ user, url }, request) => {
-        await mailer.send(emails.verifyEmail(user.email, url, langOf(request?.headers)))
+      // Choosing a password from the emailed link proves the address.
+      onPasswordReset: async ({ user }) => {
+        if (!user.emailVerified) await db.update(schema.user).set({ emailVerified: true }).where(eq(schema.user.id, user.id))
       },
     },
     session: {
@@ -109,7 +112,7 @@ export function createAuth(db: Db, config: Config, mailer: Mailer) {
         create: {
           before: async (user) => {
             const email = user.email.toLowerCase()
-            if (!(await mayRegister(email))) return false // invite-only
+            if (!(await mayRegister(db, config, email))) return false // invite-only
             // admin rights are not stored: requireAdmin checks ADMIN_EMAILS on every request
             return { data: { ...user, email } }
           },

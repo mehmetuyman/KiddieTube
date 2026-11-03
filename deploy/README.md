@@ -23,8 +23,8 @@ done once by hand, then `deploy.sh` handles updates.
    mode is **Full** (the origin certificate is self-signed; "Full (strict)"
    would reject it).
 2. **Email:** `tinyapps.dev` must show **Verified** in Resend (its DNS records
-   are already in Cloudflare). Sign-up needs it: new accounts confirm their
-   email address before they can sign in.
+   are already in Cloudflare). Sign-up needs it: new accounts choose their
+   password from a link sent by email.
 
 ## First-time setup
 
@@ -74,8 +74,9 @@ that without a password if you want hands-off deploys:
 ## After the first deploy
 
 1. Open `https://kids.tinyapps.dev/join`, sign up with your `ADMIN_EMAILS`
-   address, open the confirmation link in the email, then create your family.
-   (Admin rights need a confirmed address, so nobody else can claim it.)
+   address, open the link in the email to choose your password, sign in, then
+   create your family. (Only the owner of the inbox can set the password, so
+   nobody else can claim the admin address.)
 2. Import the current list into **your family only** (family id: Settings
    page, or `GET /api/v1/me`):
    ```bash

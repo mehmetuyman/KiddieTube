@@ -11,7 +11,7 @@ import type { Db } from './db/client.ts'
 import { createMailer, type Mailer } from './email.ts'
 import type { AppContext } from './http/context.ts'
 import { errorHandler } from './http/errors.ts'
-import { INVITE_ONLY, langOf, translate } from './lib/i18n.ts'
+import { NOT_FINISHED, langOf, translate } from './lib/i18n.ts'
 import { fetchYouTubeMeta, type YouTubeMeta } from './lib/youtube.ts'
 import { contentRoutes } from './routes/content.ts'
 import { familyRoutes } from './routes/families.ts'
@@ -76,6 +76,11 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
     config: { rateLimit: { max: config.NODE_ENV === 'test' ? 10_000 : 30, timeWindow: '1 minute' } },
     async handler(req, reply) {
       const url = new URL(req.url, config.BASE_URL)
+      // Accounts are created only through POST /api/v1/signup (no password
+      // at sign-up [review R2-4]); email verification links aren't used.
+      if (/\/api\/auth\/(sign-up\/|verify-email)/.test(url.pathname)) {
+        return reply.status(404).send({ code: 'NOT_FOUND', message: 'Not found' })
+      }
       const headers = new Headers()
       for (const [k, v] of Object.entries(req.headers)) if (v !== undefined) headers.append(k, Array.isArray(v) ? v.join(', ') : String(v))
       const response = await auth.handler(
@@ -94,7 +99,7 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
       if (text && response.status >= 400) {
         try {
           const body = JSON.parse(text) as { message?: string; code?: string }
-          if (body.code === 'FAILED_TO_CREATE_USER' && url.pathname.endsWith('/sign-up/email')) body.message = INVITE_ONLY
+          if (body.code === 'EMAIL_NOT_VERIFIED') body.message = NOT_FINISHED
           if (body.message) body.message = translate(body.message, langOf(req.headers))
           text = JSON.stringify(body)
         } catch {
@@ -114,10 +119,14 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
     }
   })
 
-  // Development/tests without a mail provider: read the captured emails (the
-  // end-to-end tests follow the confirmation links). Never in production.
-  if (config.NODE_ENV !== 'production' && !config.RESEND_API_KEY) {
-    app.get('/api/v1/dev/outbox', async () => mailer.outbox.map(({ to, subject, text }) => ({ to, subject, text })))
+  // Development/tests only, by explicit opt-in (DEV_OUTBOX, refused in
+  // production) and only from this machine: read the captured emails, which
+  // the end-to-end tests use to follow the emailed links [review R2-2].
+  if (config.DEV_OUTBOX && !config.RESEND_API_KEY) {
+    app.get('/api/v1/dev/outbox', async (req, reply) => {
+      if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '')) return reply.status(404).send()
+      return mailer.outbox.map(({ to, subject, text }) => ({ to, subject, text }))
+    })
   }
 
   await familyRoutes(app, ctx)

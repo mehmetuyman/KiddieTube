@@ -60,16 +60,22 @@ The kids' experience (grid, player, categories, themes, language) is shared.
 - `withSystem()` (cross-family) is used only to resolve a device key and for
   instance-admin lists (names and sizes, never content).
 - **Parents:** email + password (Better Auth), HttpOnly session cookies,
-  rate-limited sign-in, password reset by email. **Invite-only** sign-up, and
-  the email address must be **confirmed** (link by email) before the account
-  can sign in, so nobody can claim an admin's or an invited parent's address.
+  rate-limited sign-in, password reset by email. **Invite-only** sign-up that
+  never takes a password: `POST /api/v1/signup` creates the account with a
+  random password and emails a "choose your password" link; choosing it
+  confirms the address. Unconfirmed accounts can't sign in, so only the owner
+  of an inbox can ever set its password; registering someone else's address
+  first gains nothing and blocks nothing. Unfinished sign-ups are removed
+  after a week (nightly job).
 - **Kids:** no accounts. A device is **paired** to a kid profile; it holds a
   random 256-bit key (stored server-side only as SHA-256) and sends it as
   `Authorization: Device <key>`. Revoking stops it immediately.
 - **Kids' devices and the console (the model):** the console always needs a
-  parent **signed in**. Pairing a device **signs the parent out on that
-  device**, so a kid's device holds only its device key, which can read that
-  kid's feed and nothing else. The **parent PIN** (scrypt-hashed; 5 misses lock
+  parent **signed in**. On a paired (kid's) device, the parent session never
+  outlives the console visit: pairing signs the parent out, and so does every
+  return to the kids' page (Kids view, logo, reload, reopening the app). So a
+  kid's device holds only its device key, which can read that kid's feed and
+  nothing else. The **parent PIN** (scrypt-hashed; 5 misses lock
   it, longer each time; guesses are serialised with a row lock) is an extra
   gate on the kids' page in front of the console's sign-in screen. The gate
   fails closed: the console opens only when the server says there is no PIN

@@ -35,6 +35,8 @@ const schema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   /** Tests/dev only: answer video lookups locally instead of calling YouTube. */
   FAKE_YOUTUBE_META: envBool(false),
+  /** Tests/dev only: expose captured emails at /api/v1/dev/outbox (loopback only). */
+  DEV_OUTBOX: envBool(false),
 })
 
 export type Config = z.infer<typeof schema> & { adminEmails: string[] }
@@ -53,6 +55,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (!c.DATABASE_URL?.startsWith('postgres')) throw new Error('DATABASE_URL (postgres://...) is required in production')
     if (c.AUTH_SECRET.startsWith('dev-only')) throw new Error('AUTH_SECRET must be set in production')
     if (c.FAKE_YOUTUBE_META) throw new Error('FAKE_YOUTUBE_META is not allowed in production')
+    if (c.DEV_OUTBOX) throw new Error('DEV_OUTBOX is not allowed in production')
   }
   return {
     ...c,

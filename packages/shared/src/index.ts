@@ -137,6 +137,12 @@ export const pairDeviceBody = z.object({ kidProfileId: id, name })
 export const setPinBody = z.object({ pin: z.string().regex(/^\d{4,8}$/, 'PIN must be 4–8 digits').nullable() })
 export const verifyPinBody = z.object({ pin: z.string().min(1).max(8) })
 export const createFamilyBody = z.object({ name })
+/** Start an account: no password (it is chosen from the emailed link). `next` = where the link returns to. */
+export const signUpBody = z.object({
+  email: z.string().trim().email().max(200),
+  name: z.string().trim().min(1).max(100),
+  next: z.string().max(500).optional(),
+})
 export const inviteBody = z.object({ email: z.string().trim().email().max(200), role: role.default('parent') })
 
 /* ---------------------------------------------------------------- */
