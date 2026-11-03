@@ -366,3 +366,12 @@ describe('cross-site requests', () => {
     expect(ok.status).toBe(201)
   })
 })
+
+describe('PIN lockout escalation', () => {
+  it('doubles the lock time after each lockout, up to a cap', async () => {
+    const { pinLockMs } = await import('../routes/content.ts')
+    const min = 60 * 1000
+    expect([1, 2, 3, 4].map((n) => pinLockMs(n) / min)).toEqual([5, 10, 20, 40])
+    expect(pinLockMs(50) / min).toBe(5 * 256)
+  })
+})

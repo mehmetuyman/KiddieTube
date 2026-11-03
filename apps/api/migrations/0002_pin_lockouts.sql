@@ -1,0 +1,1 @@
+ALTER TABLE "parent_pin" ADD COLUMN "lockouts" integer DEFAULT 0 NOT NULL;

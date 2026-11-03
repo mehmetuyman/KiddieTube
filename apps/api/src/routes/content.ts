@@ -1,7 +1,7 @@
 // Family-scoped content: /api/v1/families/:familyId/...
 // Every handler checks membership, then runs inside withFamily() so
 // row-level security confines it to that family's rows.
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import {
@@ -80,6 +80,8 @@ async function assertCategories(tx: Tx, ids: (string | null | undefined)[]) {
 
 const PIN_MAX_ATTEMPTS = 5
 const PIN_LOCK_MS = 5 * 60 * 1000
+/** 5 min, then 10, 20, 40 ... capped at 2^8 x 5 min (~21 h); a correct PIN resets it. */
+export const pinLockMs = (lockouts: number) => PIN_LOCK_MS * 2 ** Math.min(Math.max(lockouts - 1, 0), 8)
 
 export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
   const base = '/api/v1/families/:familyId'
@@ -358,7 +360,7 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
         await tx
           .insert(s.parentPin)
           .values({ familyId, pinHash })
-          .onConflictDoUpdate({ target: s.parentPin.familyId, set: { pinHash, failedAttempts: 0, lockedUntil: null } })
+          .onConflictDoUpdate({ target: s.parentPin.familyId, set: { pinHash, failedAttempts: 0, lockouts: 0, lockedUntil: null } })
       }
       await touch(tx, familyId, user.id, pin === null ? 'remove' : 'set', 'parent_pin', null)
       return { set: pin !== null }
@@ -384,11 +386,22 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
       if (!row) return { ok: true }
       if (row.lockedUntil && row.lockedUntil > new Date()) throw tooMany('Too many wrong PINs. Try again in a few minutes.')
       const ok = await verifyPinHash(pin, row.pinHash)
-      const failed = ok ? 0 : row.failedAttempts + 1
+      if (ok) {
+        await tx.update(s.parentPin).set({ failedAttempts: 0, lockouts: 0, lockedUntil: null }).where(eq(s.parentPin.familyId, familyId))
+        return { ok }
+      }
+      const failed = row.failedAttempts + 1
+      const locks = failed >= PIN_MAX_ATTEMPTS
+      const lockouts = locks ? row.lockouts + 1 : row.lockouts
       await tx
         .update(s.parentPin)
-        .set({ failedAttempts: failed % PIN_MAX_ATTEMPTS, lockedUntil: failed >= PIN_MAX_ATTEMPTS ? new Date(Date.now() + PIN_LOCK_MS) : null })
-        .where(and(eq(s.parentPin.familyId, familyId)))
+        .set({
+          failedAttempts: locks ? 0 : failed,
+          lockouts,
+          lockedUntil: locks ? new Date(Date.now() + pinLockMs(lockouts)) : null,
+        })
+        .where(eq(s.parentPin.familyId, familyId))
+      if (locks) await touch(tx, familyId, null, 'locked', 'parent_pin', null, { lockouts })
       return { ok }
     })
   })

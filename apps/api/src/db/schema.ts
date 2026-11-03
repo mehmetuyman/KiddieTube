@@ -112,6 +112,8 @@ export const parentPin = pgTable('parent_pin', {
     .references(() => organization.id, { onDelete: 'cascade' }),
   pinHash: text('pin_hash').notNull(),
   failedAttempts: integer('failed_attempts').notNull().default(0),
+  /** How many times it has locked since the last correct PIN (lock time doubles each time). */
+  lockouts: integer('lockouts').notNull().default(0),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
 })
 
