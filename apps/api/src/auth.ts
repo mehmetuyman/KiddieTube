@@ -87,6 +87,9 @@ export function createAuth(db: Db, config: Config, mailer: Mailer) {
     advanced: {
       cookiePrefix: 'kt',
       useSecureCookies: config.BASE_URL.startsWith('https://'),
+      // nginx (deploy/nginx/kiddietube.conf) sets these to the real client IP;
+      // used for per-client rate limits on sign-in and password reset
+      ipAddress: { ipAddressHeaders: ['x-real-ip', 'x-forwarded-for'] },
     },
     databaseHooks: {
       user: {
