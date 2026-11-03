@@ -180,17 +180,17 @@ All input validated with zod schemas from `packages/shared`.
 ## 7. Phases
 
 ### Phase 0 — Foundations (no behaviour change)
-- [ ] Restructure into npm workspaces: current app → `apps/web`
-- [ ] Base path configurable at build time (`/KiddieTube/` for GitHub Pages,
+- [x] Restructure into npm workspaces: current app → `apps/web`
+- [x] Base path configurable at build time (`/KiddieTube/` for GitHub Pages,
       `/` for `kids.tinyapps.dev`)
-- [ ] ESLint (TypeScript + React hooks rules)
-- [ ] Vitest unit tests for the existing data logic (`videoStore`, `theme`)
-- [ ] Playwright e2e with stubbed YouTube: load, play, parent panel
+- [x] ESLint (TypeScript + React hooks rules)
+- [x] Vitest unit tests for the existing data logic (`videoStore`, `theme`)
+- [x] Playwright e2e with stubbed YouTube: load, play, parent panel
       add/hide, themes, pinned bar, landscape→portrait fullscreen flow;
       Chromium + WebKit, phone sizes
-- [ ] CI workflow on PRs (lint, typecheck, unit, build, e2e)
-- [ ] GitHub Pages deploy keeps working from the new layout
-- [ ] This roadmap + ADR-0001 (stack decisions)
+- [x] CI workflow on PRs (lint, typecheck, unit, build, e2e)
+- [ ] GitHub Pages deploy keeps working from the new layout (verify on merge)
+- [x] This roadmap + ADR-0001 (stack decisions)
 
 ### Phase 1 — Server MVP (on a branch; current site stays live)
 - [ ] `apps/api`: Fastify, config, logging, health endpoint, error handling
