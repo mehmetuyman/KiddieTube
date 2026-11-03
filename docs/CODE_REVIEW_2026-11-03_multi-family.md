@@ -203,8 +203,17 @@ The server-side device stays valid, and the Devices page lists several active de
 ## Resolution (2026-11-03)
 
 All findings are addressed on the same branch. Tests were added where a test
-can show the fix; the K1 (end-to-end) and H3 (API) tests were checked by
-re-introducing the bug and seeing them fail.
+can show the fix; the K1 (end-to-end) test was checked by re-introducing the
+bug and seeing it fail.
+
+*Correction (round 3):* the H3 test was first reported as failing without the
+fix. That check was run with a test filter, and it failed for an unrelated
+reason (the admin account from earlier tests didn't exist). Re-run on the full
+suite, the H3 test **passes even without the row lock**: the embedded test
+database (PGlite) runs one transaction at a time, so it can't reproduce the
+race. The test still checks the lockout under parallel requests; the lock
+itself (`SELECT … FOR UPDATE`) is the standard PostgreSQL fix and can only be
+exercised against a real server.
 
 | ID | Fix | Test |
 |---|---|---|
@@ -213,7 +222,7 @@ re-introducing the bug and seeing them fail.
 | K3 | `deploy.sh` no longer sources `.env`: it reads only `DATABASE_URL`; migrations run with `node --env-file`. `env.example` quotes `EMAIL_FROM`; README notes quoting. | `bash -n`; manual parse check |
 | H1 | `requireEmailVerification` + confirmation email (TR/EN); unconfirmed accounts can't sign in; the link signs in and returns to the invitation page. Admin = confirmed email in `ADMIN_EMAILS`, checked per request. | API `[H1]`; server e2e signs up through the emailed link |
 | H2 | nginx: Cloudflare real-IP snippet (`CF-Connecting-IP` from CF ranges only), `X-Forwarded-For $remote_addr`. API: `TRUST_PROXY` defaults to `127.0.0.1` and refuses `true`. Better Auth uses `x-real-ip` only. | config test |
-| H3 | `SELECT … FOR UPDATE` on `parent_pin` inside the verify transaction. | API `[H3]` (20 parallel guesses; fails without the fix) |
+| H3 | `SELECT … FOR UPDATE` on `parent_pin` inside the verify transaction. | API `[H3]` (20 parallel guesses; can't reproduce the race on PGlite, see the correction above) |
 | M1 | Lookups before any transaction, 4 at a time; one short transaction per insert; max 50 links (shared constant, checked in the console too); 2-minute client timeout; nginx 120 s for the import route. | API `[L1, L2, M1]` |
 | M2 | Migration `0003` dedupes and adds unique `member(organization_id, user_id)`; accept = conditional `UPDATE … WHERE status='pending' RETURNING` + `ON CONFLICT DO NOTHING`. | API `[M2]` (parallel + repeat accept) |
 | M3 | "Sign in" from the join/accept pages carries `?next=`; sign-in returns there (same-app paths only). | web unit `router.test.ts` |

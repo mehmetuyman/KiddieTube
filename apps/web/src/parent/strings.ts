@@ -125,7 +125,11 @@ const en = {
   avatar: 'Avatar',
   themeOnNew: 'Theme on new devices',
   defaultTheme: 'Default (Sunny)',
-  kidCategories: 'Categories this kid sees (none selected = all)',
+  kidCategories: 'Categories this kid sees',
+  allCategoriesToggle: 'All categories (and videos without a category)',
+  noVideosWarning: 'No category picked: this kid will see no videos until you pick one.',
+  noCategoriesKid: 'No categories: sees no videos',
+  kidsNowEmpty: (names: string) => `${names} now see(s) no videos: this was their only category. Pick new categories on the Kids tab.`,
   confirmRemoveKid: (n: string) => `Remove ${n}? Devices paired to this profile stop working.`,
 
   // devices
@@ -317,7 +321,11 @@ const tr: ConsoleStrings = {
   avatar: 'Avatar',
   themeOnNew: 'Yeni cihazlarda tema',
   defaultTheme: 'Varsayılan (Güneşli)',
-  kidCategories: 'Bu çocuğun gördüğü kategoriler (hiçbiri seçilmezse tümü)',
+  kidCategories: 'Bu çocuğun gördüğü kategoriler',
+  allCategoriesToggle: 'Tüm kategoriler (ve kategorisiz videolar)',
+  noVideosWarning: 'Kategori seçilmedi: siz seçene kadar bu çocuk hiç video görmez.',
+  noCategoriesKid: 'Kategori yok: hiç video görmez',
+  kidsNowEmpty: (names) => `${names} artık hiç video görmüyor: bu, tek kategorileriydi. Çocuklar sekmesinden yeni kategoriler seçin.`,
   confirmRemoveKid: (n) => `${n} kaldırılsın mı? Bu profile bağlı cihazlar çalışmayı durdurur.`,
 
   devicesIntro:

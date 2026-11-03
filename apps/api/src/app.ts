@@ -5,13 +5,14 @@ import helmet from '@fastify/helmet'
 import rateLimit from '@fastify/rate-limit'
 import { sql } from 'drizzle-orm'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { createAuth } from './auth.ts'
+import { createAuth, linkRecentlySent } from './auth.ts'
 import type { Config } from './config.ts'
 import type { Db } from './db/client.ts'
 import { createMailer, type Mailer } from './email.ts'
 import type { AppContext } from './http/context.ts'
 import { errorHandler } from './http/errors.ts'
 import { NOT_FINISHED, langOf, translate } from './lib/i18n.ts'
+import { redactUrl } from './lib/logging.ts'
 import { fetchYouTubeMeta, type YouTubeMeta } from './lib/youtube.ts'
 import { contentRoutes } from './routes/content.ts'
 import { familyRoutes } from './routes/families.ts'
@@ -34,8 +35,16 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
         ? false
         : {
             level: config.LOG_LEVEL,
-            // never log credentials
+            // never log credentials (headers aren't logged at all; tokens in URLs are masked)
             redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+            serializers: {
+              req: (r: { method: string; url: string; hostname?: string; ip?: string }) => ({
+                method: r.method,
+                url: redactUrl(r.url),
+                hostname: r.hostname,
+                remoteAddress: r.ip,
+              }),
+            },
           },
   })
 
@@ -80,6 +89,14 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
       // at sign-up [review R2-4]); email verification links aren't used.
       if (/\/api\/auth\/(sign-up\/|verify-email)/.test(url.pathname)) {
         return reply.status(404).send({ code: 'NOT_FOUND', message: 'Not found' })
+      }
+      // "Forgot password": the same per-address cooldown as sign-up; the
+      // answer is Better Auth's usual one either way [review R3-2]
+      if (req.method === 'POST' && url.pathname === '/api/auth/request-password-reset') {
+        const email = (req.body as { email?: unknown } | undefined)?.email
+        if (typeof email === 'string' && (await linkRecentlySent(db, email))) {
+          return reply.send({ status: true, message: 'If this email exists in our system, check your email for the reset link' })
+        }
       }
       const headers = new Headers()
       for (const [k, v] of Object.entries(req.headers)) if (v !== undefined) headers.append(k, Array.isArray(v) ? v.join(', ') : String(v))

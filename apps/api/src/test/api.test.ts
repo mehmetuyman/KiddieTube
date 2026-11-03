@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { withFamily } from '../db/context.ts'
+import { withFamily, withSystem } from '../db/context.ts'
 import * as s from '../db/schema.ts'
 import { ADMIN_EMAIL, Client, adminWithFamily, createHarness, invitedFamily, type Harness } from './harness.ts'
 
@@ -127,7 +127,7 @@ describe('content', () => {
     expect(re.body.map((x: { name: string }) => x.name)).toEqual(['Cartoons', 'Songs'])
     const ren = await c.req('PATCH', url(`/categories/${one.body.id}`), { name: 'Kids Songs' })
     expect(ren.body.name).toBe('Kids Songs')
-    expect((await c.req('DELETE', url(`/categories/${two.body.id}`))).status).toBe(204)
+    expect((await c.req('DELETE', url(`/categories/${two.body.id}`))).body).toEqual({ emptiedProfiles: [] })
   })
 
   it('videos: add by link (title looked up), duplicates rejected, edit, hide, delete', async () => {
@@ -571,5 +571,79 @@ describe('unfinished sign-ups', () => {
     const removed = await pruneUnfinishedAccounts(h.db.db, -1000) // "older than now + 1s": every unfinished one
     expect(removed).toBeGreaterThan(0)
     expect((await admin.req('GET', '/api/v1/me')).status).toBe(200)
+  })
+})
+
+describe('kid profile restrictions', () => {
+  async function setup(name: string) {
+    const c = new Client(h)
+    await c.signIn(ADMIN_EMAIL)
+    const fam = (await c.req('POST', '/api/v1/families', { name })).body.id
+    const u = (p: string) => `/api/v1/families/${fam}${p}`
+    const toddler = (await c.req('POST', u('/categories'), { name: 'Toddler songs', emoji: '🎵' })).body.id
+    const teen = (await c.req('POST', u('/categories'), { name: 'Teen stuff', emoji: '🎬' })).body.id
+    await c.req('POST', u('/videos'), { url: 'toddler0001', categoryId: toddler })
+    await c.req('POST', u('/videos'), { url: 'teenteen001', categoryId: teen })
+    await c.req('POST', u('/videos'), { url: 'nocategory1' })
+    const kid = await c.req('POST', u('/profiles'), { name: 'Baby', allCategories: false, categoryIds: [toddler] })
+    const key = (await c.req('POST', u('/devices'), { kidProfileId: kid.body.id, name: 'Tab' })).body.deviceKey
+    const feed = async () => (await new Client(h).req('GET', '/api/v1/feed', undefined, { authorization: `Device ${key}` })).body
+    return { c, fam, u, toddler, teen, kid: kid.body, feed }
+  }
+
+  it('[R3-1] deleting a restricted kid’s last category leaves them with nothing, and says so', async () => {
+    const { c, u, toddler, feed } = await setup('Restrict Family')
+    expect((await feed()).categories.map((x: { name: string }) => x.name)).toEqual(['Toddler songs'])
+    const del = await c.req('DELETE', u(`/categories/${toddler}`))
+    expect(del.body).toEqual({ emptiedProfiles: ['Baby'] })
+    const after = await feed()
+    expect(after.categories).toEqual([])
+    expect(after.videos).toEqual([])
+    const p = (await c.req('GET', u('/profiles'))).body.find((x: { name: string }) => x.name === 'Baby')
+    expect(p).toMatchObject({ allCategories: false, categoryIds: [] })
+  })
+
+  it('[R3-1] "no categories" is a real choice; "all categories" is explicit', async () => {
+    const { c, u, kid, feed } = await setup('Choice Family')
+    await c.req('PATCH', u(`/profiles/${kid.id}`), { allCategories: false, categoryIds: [] })
+    expect((await feed()).videos).toEqual([])
+    // an empty list without the flag (older client) doesn't turn into "everything"
+    await c.req('PATCH', u(`/profiles/${kid.id}`), { categoryIds: [] })
+    expect((await feed()).videos).toEqual([])
+    await c.req('PATCH', u(`/profiles/${kid.id}`), { allCategories: true })
+    expect((await feed()).videos.map((v: { youtubeId: string }) => v.youtubeId).sort()).toEqual(['nocategory1', 'teenteen001', 'toddler0001'])
+  })
+
+  it('[R3-1] the migration marks existing restricted profiles, under row-level security', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { fam, kid, feed } = await setup('Migrate Family')
+    // back to the pre-migration state: the flag says "all" although rows exist
+    await withSystem(h.db.db, (tx) => tx.execute(sql`update kid_profile set all_categories = true`))
+    expect((await feed()).categories.length).toBe(2)
+    // the migration's statements, run as the app's ordinary role (RLS applies)
+    const file = readFileSync(new URL('../../migrations/0004_kid_all_categories.sql', import.meta.url), 'utf8')
+    for (const stmt of file.split('--> statement-breakpoint').slice(1)) await h.db.db.execute(sql.raw(stmt))
+    const rows = await withFamily(h.db.db, fam, (tx) => tx.execute(sql`select all_categories from kid_profile where id = ${kid.id}`))
+    expect(JSON.stringify(rows)).toContain('false')
+    expect((await feed()).categories.map((x: { name: string }) => x.name)).toEqual(['Toddler songs'])
+  })
+})
+
+describe('password-link emails', () => {
+  it('[R3-2] go out at most once per address per cooldown, from sign-up and from "forgot password" alike', async () => {
+    const admin = new Client(h)
+    await admin.signIn(ADMIN_EMAIL)
+    await admin.req('POST', '/api/v1/admin/family-invites', { email: 'flood@example.com' })
+    const sent = () => h.outbox.filter((m) => m.to === 'flood@example.com' && /reset-password/.test(m.text)).length
+    for (let i = 0; i < 5; i++) {
+      const r = await new Client(h).req('POST', '/api/v1/signup', { email: 'flood@example.com', name: 'F' })
+      expect(r.body).toEqual({ sent: true }) // same answer every time
+    }
+    expect(sent()).toBe(1)
+    for (let i = 0; i < 3; i++) {
+      const r = await new Client(h).req('POST', '/api/auth/request-password-reset', { email: 'flood@example.com', redirectTo: '/reset-password' })
+      expect(r.status).toBe(200)
+    }
+    expect(sent()).toBe(1)
   })
 })

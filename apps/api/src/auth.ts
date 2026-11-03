@@ -15,7 +15,7 @@
 import { betterAuth } from 'better-auth'
 import { langOf } from './lib/i18n.ts'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { and, eq, gt, isNull } from 'drizzle-orm'
+import { and, eq, gt, isNull, like } from 'drizzle-orm'
 import { isInstanceAdmin, type Config } from './config.ts'
 import type { Db } from './db/client.ts'
 import { withSystem } from './db/context.ts'
@@ -52,6 +52,31 @@ export async function mayRegister(db: Db, config: Config, email: string): Promis
       .limit(1)
     return mi.length > 0
   })
+}
+
+/** One "choose your password" / reset email per address per this long [review R3-2]. */
+export const LINK_COOLDOWN_MS = 2 * 60 * 1000
+
+/**
+ * Was a password link sent to this address within the cooldown? (Better Auth
+ * stores each link as a verification row `reset-password:<token>` holding the
+ * user id.) Callers skip sending but answer as usual, revealing nothing.
+ */
+export async function linkRecentlySent(db: Db, email: string): Promise<boolean> {
+  const [u] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.email, email.toLowerCase()))
+  if (!u) return false
+  const recent = await db
+    .select({ id: schema.verification.id })
+    .from(schema.verification)
+    .where(
+      and(
+        eq(schema.verification.value, u.id),
+        like(schema.verification.identifier, 'reset-password:%'),
+        gt(schema.verification.createdAt, new Date(Date.now() - LINK_COOLDOWN_MS)),
+      ),
+    )
+    .limit(1)
+  return recent.length > 0
 }
 
 export function createAuth(db: Db, config: Config, mailer: Mailer) {

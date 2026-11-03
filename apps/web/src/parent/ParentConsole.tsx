@@ -11,6 +11,7 @@ import './console.css'
 import GetStarted from './GetStarted'
 import { c } from './strings'
 import { getLang, setLang, type Lang } from '../lib/i18n'
+import { signOutWhenConsoleCloses } from '../server/device'
 
 export interface Me {
   user: { id: string; email: string; name: string; isAdmin: boolean }
@@ -44,6 +45,9 @@ export default function ParentConsole() {
   useEffect(() => {
     void loadMe()
   }, [loadMe])
+
+  // on a kid's device the parent session ends with the visit [review R2-1, R2-7]
+  useEffect(() => signOutWhenConsoleCloses(), [])
 
   // Landing pages from email links work signed-out too
   if (path.startsWith('/reset-password')) return <Shell><ResetPassword onDone={loadMe} /></Shell>

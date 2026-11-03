@@ -60,6 +60,18 @@ The GitHub Pages build keeps working as before.
     only this machine (R2-2).
   - Import shows only our own error messages (R2-3); deploy and comment nits
     (R2-5, R2-6).
+- **Review round 3** (`docs/CODE_REVIEW_2026-11-03_multi-family_round3.md`):
+  - Kid profiles have an explicit "all categories" setting (migration `0004`).
+    Deleting a restricted kid's last category, or choosing none, means **no
+    videos**, never all; the console warns and names affected kids (R3-1).
+  - At most one password-link email per address every 2 minutes, from sign-up
+    and "forgot password" (R3-2).
+  - Password-link tokens and invitation ids are masked in API and nginx logs
+    (R3-3).
+  - Runbook for a Cloudflare Origin certificate + "Full (strict)", and an
+    optional firewall-rule printer (R3-4, owner action).
+  - The console signs out when its page closes on a paired device (R2-7);
+    nits (R3-5).
 - **Turkish and English everywhere,** chosen per device (defaults to the
   device language; switchable in the console header, Settings, and the
   on-device panel's Theme tab): kids' page, parent console, on-device parent

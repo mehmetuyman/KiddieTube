@@ -449,13 +449,16 @@ export function CategoriesPage({ familyId }: PageProps) {
               <button
                 className="pp-btn pp-btn-danger"
                 disabled={act.busy}
-                onClick={() =>
-                  window.confirm(c.confirmDeleteCategory(cat.name)) &&
-                  act.run(async () => {
-                    await api.del(`/families/${familyId}/categories/${cat.id}`)
+                onClick={async () => {
+                  if (!window.confirm(c.confirmDeleteCategory(cat.name))) return
+                  let emptied: string[] = []
+                  await act.run(async () => {
+                    emptied = (await api.del<{ emptiedProfiles: string[] }>(`/families/${familyId}/categories/${cat.id}`)).emptiedProfiles
                     await cats.reload()
                   }, c.deleted)
-                }
+                  // kids limited to just this category now see nothing [review R3-1]
+                  if (emptied.length) window.alert(c.kidsNowEmpty(emptied.join(', ')))
+                }}
               >
                 {c.delete}
               </button>
@@ -535,9 +538,11 @@ export function ProfilesPage({ familyId }: PageProps) {
                   {p.name} {here && <span className="pp-tag">{c.thisDevice}</span>}
                 </div>
                 <div className="pp-row-cat">
-                  {p.categoryIds.length === 0
+                  {p.allCategories
                     ? c.allCategories
-                    : (cats.data ?? [])
+                    : p.categoryIds.length === 0
+                      ? c.noCategoriesKid
+                      : (cats.data ?? [])
                         .filter((x) => p.categoryIds.includes(x.id))
                         .map((x) => `${x.emoji} ${x.name}`)
                         .join(', ')}
@@ -574,10 +579,11 @@ function EditProfile({
   const [name, setName] = useState(profile?.name ?? '')
   const [avatar, setAvatar] = useState(profile?.avatar ?? AVATARS[0])
   const [defaultTheme, setDefaultTheme] = useState(profile?.defaultTheme ?? null)
+  const [all, setAll] = useState(profile?.allCategories ?? true)
   const [catIds, setCatIds] = useState<string[]>(profile?.categoryIds ?? [])
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    const body = { name, avatar, defaultTheme, categoryIds: catIds }
+    const body = { name, avatar, defaultTheme, allCategories: all, categoryIds: all ? [] : catIds }
     const ok = await act.run(() =>
       profile ? api.patch(`/families/${familyId}/profiles/${profile.id}`, body) : api.post(`/families/${familyId}/profiles`, body),
     )
@@ -614,7 +620,12 @@ function EditProfile({
       </label>
       <div className="pp-field">
         <span>{c.kidCategories}</span>
-        <div className="pc-chip-row">
+        <label className="pc-check">
+          <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
+          {c.allCategoriesToggle}
+        </label>
+        {!all && catIds.length === 0 && <div className="pp-error">{c.noVideosWarning}</div>}
+        <div className="pc-chip-row" hidden={all}>
           {categories.map((cat) => {
             const on = catIds.includes(cat.id)
             return (

@@ -2,7 +2,7 @@
 // its kid profile, the categories it may see and their visible videos.
 // Devices store it locally and re-fetch with If-None-Match; an unchanged
 // family answers 304 with no body.
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import type { Feed } from '@kiddietube/shared'
 import { withFamily } from '../db/context.ts'
@@ -23,15 +23,23 @@ export async function feedRoutes(app: FastifyInstance, ctx: AppContext) {
       const [profile] = await tx.select().from(s.kidProfile).where(eq(s.kidProfile.id, device.kidProfileId))
       if (!profile) throw notFound('Kid profile not found')
 
-      const allowed = (
-        await tx.select({ id: s.kidProfileCategory.categoryId }).from(s.kidProfileCategory).where(eq(s.kidProfileCategory.kidProfileId, profile.id))
-      ).map((r) => r.id)
-      const restrict = allowed.length > 0 // no rows = everything
+      // Restriction is explicit: a restricted kid with no categories left sees
+      // nothing, never everything [review R3-1].
+      const restrict = !profile.allCategories
+      const allowed = restrict
+        ? (
+            await tx
+              .select({ id: s.kidProfileCategory.categoryId })
+              .from(s.kidProfileCategory)
+              .where(eq(s.kidProfileCategory.kidProfileId, profile.id))
+          ).map((r) => r.id)
+        : []
+      const none = restrict && allowed.length === 0
 
       const categories = await tx
         .select()
         .from(s.category)
-        .where(restrict ? inArray(s.category.id, allowed) : undefined)
+        .where(none ? sql`false` : restrict ? inArray(s.category.id, allowed) : undefined)
         .orderBy(asc(s.category.sortOrder), asc(s.category.createdAt))
 
       const videos = await tx
@@ -42,7 +50,7 @@ export async function feedRoutes(app: FastifyInstance, ctx: AppContext) {
             eq(s.video.hidden, false),
             eq(s.video.status, 'ok'),
             // a restricted profile sees only its categories (uncategorised videos are hidden for it)
-            restrict ? inArray(s.video.categoryId, allowed) : undefined,
+            none ? sql`false` : restrict ? inArray(s.video.categoryId, allowed) : undefined,
           ),
         )
         .orderBy(desc(s.video.createdAt))

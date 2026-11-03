@@ -1,12 +1,11 @@
 // Families, members and invitations, plus instance-admin family invites.
 import { and, desc, eq, gt, isNull } from 'drizzle-orm'
-import { langOf } from '../lib/i18n.ts'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { createFamilyBody, inviteBody, signUpBody, type Family } from '@kiddietube/shared'
 import { fromNodeHeaders } from 'better-auth/node'
-import { mayRegister } from '../auth.ts'
-import { INVITE_ONLY } from '../lib/i18n.ts'
+import { linkRecentlySent, mayRegister } from '../auth.ts'
+import { INVITE_ONLY, langOf } from '../lib/i18n.ts'
 import { withFamily, withSystem } from '../db/context.ts'
 import * as s from '../db/schema.ts'
 import { emails } from '../email.ts'
@@ -25,7 +24,6 @@ const slugify = (name: string) =>
     .slice(0, 40) || 'family'
 
 export async function familyRoutes(app: FastifyInstance, ctx: AppContext) {
-  /** The signed-in parent and the families they belong to. */
   /**
    * Start an account (invite-only): no password here. The account gets a
    * random password nobody knows, and the email gets a "choose your password"
@@ -42,6 +40,8 @@ export async function familyRoutes(app: FastifyInstance, ctx: AppContext) {
       const [existing] = await ctx.db.select({ id: s.user.id }).from(s.user).where(eq(s.user.email, email))
       if (!existing) await ctx.auth.api.signUpEmail({ body: { email, name: body.name, password: newSecret() } })
       const next = body.next && body.next.startsWith('/') && !body.next.startsWith('//') ? body.next : '/parent'
+      // one email per address every couple of minutes, however many requests [review R3-2]
+      if (await linkRecentlySent(ctx.db, email)) return { sent: true }
       await ctx.auth.api.requestPasswordReset({
         body: { email, redirectTo: `/reset-password?next=${encodeURIComponent(next)}` },
         headers: fromNodeHeaders(req.headers),
@@ -50,6 +50,7 @@ export async function familyRoutes(app: FastifyInstance, ctx: AppContext) {
     },
   )
 
+  /** The signed-in parent and the families they belong to. */
   app.get('/api/v1/me', async (req) => {
     const user = await requireUser(ctx, req)
     const rows = await ctx.db

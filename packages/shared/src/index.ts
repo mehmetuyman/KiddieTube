@@ -75,7 +75,11 @@ export const kidProfile = z.object({
   name,
   avatar: emoji.nullable(),
   defaultTheme: themeId.nullable(),
-  /** Categories this profile sees; empty = all categories. */
+  /**
+   * true: sees every category (and uncategorised videos). false: sees only
+   * `categoryIds`, which may be none (then an empty list) [review R3-1].
+   */
+  allCategories: z.boolean(),
   categoryIds: z.array(id),
 })
 export type KidProfile = z.infer<typeof kidProfile>
@@ -129,6 +133,8 @@ export const createKidProfileBody = z.object({
   name,
   avatar: emoji.nullable().optional(),
   defaultTheme: themeId.nullable().optional(),
+  /** Default true. Send false with `categoryIds` to restrict the kid. */
+  allCategories: z.boolean().optional(),
   categoryIds: z.array(id).max(200).optional(),
 })
 export const updateKidProfileBody = createKidProfileBody.partial().refine(nonEmpty, { message: 'Nothing to update' })

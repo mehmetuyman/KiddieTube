@@ -269,3 +269,11 @@
   font-size: 0.85rem;
   color: #35506b;
 }
+
+.pc-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 0.9rem;
+}

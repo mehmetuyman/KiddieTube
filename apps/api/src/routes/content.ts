@@ -69,7 +69,8 @@ async function loadProfiles(tx: Tx): Promise<KidProfile[]> {
     name: p.name,
     avatar: p.avatar,
     defaultTheme: p.defaultTheme,
-    categoryIds: links.filter((l) => l.kidProfileId === p.id).map((l) => l.categoryId),
+    allCategories: p.allCategories,
+    categoryIds: p.allCategories ? [] : links.filter((l) => l.kidProfileId === p.id).map((l) => l.categoryId),
   }))
 }
 
@@ -143,12 +144,16 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
   app.delete(`${base}/categories/:id`, async (req, reply) => {
     const { familyId, id } = params.parse(req.params)
     const { user } = await requireMember(ctx, req, familyId)
-    await withFamily(ctx.db, familyId, async (tx) => {
+    // Restricted kids for whom this was the last allowed category now see
+    // nothing (never "everything" [review R3-1]); tell the parent who.
+    const emptiedProfiles = await withFamily(ctx.db, familyId, async (tx) => {
+      const restricted = (await loadProfiles(tx)).filter((p) => !p.allCategories && p.categoryIds.includes(id!))
       const r = await tx.delete(s.category).where(eq(s.category.id, id!)).returning({ id: s.category.id })
       if (!r.length) throw notFound('Category not found')
       await touch(tx, familyId, user.id, 'delete', 'category', id!) // its videos become uncategorised
+      return restricted.filter((p) => p.categoryIds.length === 1).map((p) => p.name)
     })
-    return reply.status(204).send()
+    return reply.send({ emptiedProfiles })
   })
 
   /* ------------------------------- videos ------------------------------- */
@@ -327,11 +332,13 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
     const { user } = await requireMember(ctx, req, familyId)
     const body = createKidProfileBody.parse(req.body)
     const profile = await withFamily(ctx.db, familyId, async (tx) => {
+      // Older clients sent only categoryIds (non-empty = restricted)
+      const allCategories = body.allCategories ?? !body.categoryIds?.length
       const [p] = await tx
         .insert(s.kidProfile)
-        .values({ id: newId('kid_'), familyId, name: body.name, avatar: body.avatar ?? null, defaultTheme: body.defaultTheme ?? null })
+        .values({ id: newId('kid_'), familyId, name: body.name, avatar: body.avatar ?? null, defaultTheme: body.defaultTheme ?? null, allCategories })
         .returning()
-      await setProfileCategories(tx, familyId, p.id, body.categoryIds ?? [])
+      await setProfileCategories(tx, familyId, p.id, allCategories ? [] : (body.categoryIds ?? []))
       await touch(tx, familyId, user.id, 'create', 'kid_profile', p.id, { name: p.name })
       return (await loadProfiles(tx)).find((x) => x.id === p.id)!
     })
@@ -342,11 +349,15 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
     const { familyId, id } = params.parse(req.params)
     const { user } = await requireMember(ctx, req, familyId)
     const { categoryIds, ...fields } = updateKidProfileBody.parse(req.body)
+    // categoryIds without allCategories (older clients): a non-empty list restricts;
+    // an empty one keeps the current mode, so it never silently means "everything"
+    if (fields.allCategories === undefined && categoryIds?.length) fields.allCategories = false
     return withFamily(ctx.db, familyId, async (tx) => {
       const exists = await tx.select({ id: s.kidProfile.id }).from(s.kidProfile).where(eq(s.kidProfile.id, id!))
       if (!exists.length) throw notFound('Profile not found')
       if (Object.keys(fields).length) await tx.update(s.kidProfile).set(fields).where(eq(s.kidProfile.id, id!))
-      if (categoryIds) await setProfileCategories(tx, familyId, id!, categoryIds)
+      if (fields.allCategories) await setProfileCategories(tx, familyId, id!, [])
+      else if (categoryIds) await setProfileCategories(tx, familyId, id!, categoryIds)
       await touch(tx, familyId, user.id, 'update', 'kid_profile', id!, { ...fields, categoryIds })
       return (await loadProfiles(tx)).find((x) => x.id === id)!
     })

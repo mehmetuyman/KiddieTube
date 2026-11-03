@@ -98,6 +98,22 @@ export function endParentSessionOnKidsDevice(): void {
   )
 }
 
+/**
+ * While the console is open on a paired device: end the parent session when
+ * the page goes away (tab or app closed, reload), not only when the kids'
+ * page next opens [review R2-7]. A beacon still gets out while unloading.
+ * Returns a function that stops listening.
+ */
+export function signOutWhenConsoleCloses(): () => void {
+  if (!getPairing()) return () => {}
+  const onHide = () => {
+    const url = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api/auth/sign-out`
+    navigator.sendBeacon?.(url, new Blob(['{}'], { type: 'application/json' }))
+  }
+  window.addEventListener('pagehide', onHide)
+  return () => window.removeEventListener('pagehide', onHide)
+}
+
 /** Resolves once the sign-out started above has finished. */
 export const parentSessionEnded = () => parentSessionEnding
 

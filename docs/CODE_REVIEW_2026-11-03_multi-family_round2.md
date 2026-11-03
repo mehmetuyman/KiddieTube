@@ -101,3 +101,25 @@ The comment "Ask the server whether `pin` is this family's parent PIN" now sits 
 | R2-4 | **Stronger than suggested.** While fixing it I found a worse variant: a squatter registers an invited (or the admin) address **with a password they choose**; the owner then receives a genuine confirmation email, and clicking it would confirm an account whose password the squatter knows. So sign-up no longer takes a password at all: `POST /api/v1/signup` (invite-only, rate-limited) creates the account with a random password and sends a "choose your password" link (Better Auth's reset flow, which keeps `next`). `onPasswordReset` marks the address confirmed; unconfirmed accounts can't sign in. Signing up again for an existing address just sends a fresh link, so nothing is blocked. Better Auth's own `/sign-up/*` and `/verify-email` are closed (404). Unfinished sign-ups are removed after a week by the nightly job. | API `[H1, R2-4]` (direct sign-up closed; squatter can't sign in; owner signs up again and finishes), `[R2-4]` prune; server e2e signs up through the emailed link |
 | R2-5 | `\|\| true` inside the substitution; verified that a `.env` without `DATABASE_URL` reaches the message instead of the rollback. | manual bash check |
 | R2-6 | Comment moved above `verifyPinWithDevice`. | — |
+
+---
+
+## Reviewer verification of round 2 (`3d0761c`… → `e783728`)
+
+- **Commit:** `e783728` "fix: address code review round 2 [review R2-1..R2-6]".
+- **Checks:** `npm run typecheck` and `npm run lint` clean; `npm test` API 43/43, web 40/40; `npm run test:e2e:server` 3/3 passed (incl. the R2-1 steps and sign-up through the emailed link).
+
+| ID | Status | Notes |
+|---|---|---|
+| R2-1 | **Fixed** | The kids' page signs out on mount on a paired device (`endParentSessionOnKidsDevice`), and the PIN gate waits for that sign-out before opening the console, so the console always asks for a sign-in there. Covered by the e2e test: PIN → sign-in shown; sign in → "Kids' view" → `/parent` shows sign-in again. |
+| R2-2 | **Fixed** | Explicit `DEV_OUTBOX` opt-in, refused in production by `loadConfig` (config test), loopback-only, and only without a mail provider. |
+| R2-3 | **Fixed** | Only `HttpError` messages reach the parent; anything else is logged and shown as the translated "Something went wrong". |
+| R2-4 | **Fixed, and better than asked** | The agent spotted a real hole in my H1 suggestion: with "confirm by link", a squatter who *chose the password* could have the real owner confirm the squatter's account. Password-less `POST /api/v1/signup` + "choose your password" link (`onPasswordReset` marks the address confirmed) closes it. Better Auth's `/sign-up/*` and `/verify-email` return 404, and the creation hook still enforces invite-only. Signing up again just re-sends a link. Unfinished accounts are pruned after 7 days (they can't be members of anything, so nothing cascades). |
+| R2-5 | **Fixed** | |
+| R2-6 | **Fixed** | |
+
+**Remaining nit (optional, not a blocker): R2-7. A console tab can outlive the parent's visit on a paired device**
+
+The sign-out happens when the **kids' page** loads. If a parent signs in on a kid's tablet and then leaves the browser on the console, or closes the tab without going back to the kids' page, the session stays until the kids' page is next opened. In the installed app that is the next launch (`start_url` is the kids' page). In a plain browser tab, reopening `/parent` from history would still be signed in. To close it fully, also sign out from the console on a paired device on `pagehide` (best effort, e.g. `navigator.sendBeacon` to `/api/auth/sign-out`), or give console sessions created on paired devices a short lifetime.
+
+**Verdict:** all round-2 findings are resolved. Fine to push and deploy for the phone test; R2-7 can follow.

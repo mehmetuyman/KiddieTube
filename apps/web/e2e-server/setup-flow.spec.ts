@@ -64,6 +64,12 @@ test('admin creates a family, adds content, pairs a device; the kids page works 
   await page.locator('.pc-nav').getByRole('button', { name: /Kids/ }).click()
   await page.getByRole('button', { name: '+ Add kid' }).click()
   await page.getByLabel('Name').fill('Ali')
+  // "no categories" is a real choice, so the console warns about it [review R3-1]
+  const allCats = page.getByLabel('All categories (and videos without a category)')
+  await allCats.uncheck()
+  await expect(page.getByText('this kid will see no videos')).toBeVisible()
+  await allCats.check()
+  await expect(page.getByText('this kid will see no videos')).toHaveCount(0)
   await page.getByRole('button', { name: 'Save' }).click()
   promptAnswer = 'Test tablet'
   const alerted = page.waitForEvent('dialog', (d) => d.type() === 'alert')
@@ -97,6 +103,14 @@ test('admin creates a family, adds content, pairs a device; the kids page works 
 
   // A parent who signs in on the kid's device is signed out again as soon as
   // they go back to the kids' page [review R2-1]
+  await signIn(page, 'admin@example.com')
+  await expect(page.locator('.pc-nav')).toBeVisible()
+  // ...or as soon as the console page goes away (reload, tab/app closed) [review R2-7]
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Parent sign-in' })).toBeVisible()
+  // Better Auth allows only a few sign-ins per client per 10 s (wanted in
+  // production); this story signs in three times, so wait the window out
+  await page.waitForTimeout(10_000)
   await signIn(page, 'admin@example.com')
   await expect(page.locator('.pc-nav')).toBeVisible()
   const signedOut = page.waitForResponse('**/api/auth/sign-out')

@@ -68,12 +68,14 @@ export const kidProfile = pgTable(
     name: text('name').notNull(),
     avatar: text('avatar'),
     defaultTheme: text('default_theme', { enum: ['sunny', 'ocean', 'candy', 'classic'] }),
+    /** false = only the linked categories (kid_profile_category), possibly none. */
+    allCategories: boolean('all_categories').notNull().default(true),
     createdAt: createdAt(),
   },
   (t) => [index('kid_profile_family_idx').on(t.familyId)],
 )
 
-/** Which categories a kid profile sees. No rows = all categories. */
+/** The categories a restricted kid profile (all_categories = false) sees. */
 export const kidProfileCategory = pgTable(
   'kid_profile_category',
   {

@@ -122,6 +122,25 @@ pg_restore --clean --if-exists -d "$DATABASE_URL" /var/backups/kiddietube/pre-de
 /opt/kiddietube/deploy/deploy.sh <previous tag or commit>
 ```
 
+## Cloudflare origin hardening (owner; affects all of tinyapps.dev)
+
+Today Cloudflare's SSL mode is **Full** and the origin uses a self-signed
+certificate, so Cloudflare encrypts to the server but doesn't check *who*
+answers, and anyone who finds the home IP can reach nginx directly
+(skipping Cloudflare's protection). To close both [review R3-4]:
+
+1. **Origin certificate:** Cloudflare → tinyapps.dev → SSL/TLS → Origin
+   Server → *Create certificate* (hostnames `tinyapps.dev`, `*.tinyapps.dev`,
+   15 years). Save it as `/etc/nginx/ssl/cf-origin.pem` and the key as
+   `/etc/nginx/ssl/cf-origin.key` (`chmod 600`).
+2. Point **every** server block that uses `self.crt` at the new files (the
+   other apps too), `sudo nginx -t && sudo systemctl reload nginx`, check each
+   site still loads.
+3. Switch SSL/TLS mode to **Full (strict)**; check each site again.
+4. Optional: let only Cloudflare reach port 443. `deploy/cloudflare-ufw.sh`
+   prints the ufw rules from the same ranges as the real-IP snippet; review
+   and run them yourself. (SSH on the LAN is unaffected.)
+
 ## Notes
 
 - **Client IPs behind Cloudflare:** `snippets/kiddietube-cloudflare-realip.conf`

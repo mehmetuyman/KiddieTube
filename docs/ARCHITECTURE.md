@@ -73,9 +73,16 @@ The kids' experience (grid, player, categories, themes, language) is shared.
 - **Kids' devices and the console (the model):** the console always needs a
   parent **signed in**. On a paired (kid's) device, the parent session never
   outlives the console visit: pairing signs the parent out, and so does every
-  return to the kids' page (Kids view, logo, reload, reopening the app). So a
-  kid's device holds only its device key, which can read that kid's feed and
-  nothing else. The **parent PIN** (scrypt-hashed; 5 misses lock
+  return to the kids' page (Kids view, logo, reload, reopening the app), and
+  closing or reloading the console page itself. (So on a kid's device, even
+  switching the console's language asks for the password again.) A kid's
+  device therefore holds only its device key, which can read that kid's feed
+  and nothing else.
+- **What a kid sees:** a kid profile either sees **all categories** (and
+  uncategorised videos) or **only its chosen categories**, which may be none
+  (then nothing). The choice is an explicit flag, so deleting a restricted
+  kid's last category leaves them with nothing, never with everything; the
+  parent is told. The **parent PIN** (scrypt-hashed; 5 misses lock
   it, longer each time; guesses are serialised with a row lock) is an extra
   gate on the kids' page in front of the console's sign-in screen. The gate
   fails closed: the console opens only when the server says there is no PIN
