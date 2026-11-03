@@ -1,0 +1,25 @@
+# /etc/systemd/system/kiddietube.service
+# Kiddie Tube API (the web app is static files served by nginx).
+[Unit]
+Description=Kiddie Tube API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/kiddietube/apps/api
+EnvironmentFile=/opt/kiddietube/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node --import tsx src/server.ts
+Restart=on-failure
+RestartSec=5
+# Hardening: read-only system, no privilege escalation, private /tmp
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/opt/kiddietube
+
+[Install]
+WantedBy=multi-user.target
