@@ -75,6 +75,59 @@ export async function familyRoutes(app: FastifyInstance, ctx: AppContext) {
     return { id: familyId, name: body.name, role: 'owner' } satisfies Family
   })
 
+  /** Everything this family stores, as one JSON document (any parent). */
+  app.get('/api/v1/families/:familyId/export', async (req, reply) => {
+    const { familyId } = z.object({ familyId: z.string() }).parse(req.params)
+    const { user } = await requireMember(ctx, req, familyId)
+    const [fam] = await ctx.db.select().from(s.organization).where(eq(s.organization.id, familyId))
+    const members = await ctx.db
+      .select({ name: s.user.name, email: s.user.email, role: s.member.role, since: s.member.createdAt })
+      .from(s.member)
+      .innerJoin(s.user, eq(s.user.id, s.member.userId))
+      .where(eq(s.member.organizationId, familyId))
+    const data = await withFamily(ctx.db, familyId, async (tx) => {
+      const out = {
+        categories: await tx.select().from(s.category),
+        videos: await tx.select().from(s.video),
+        kidProfiles: await tx.select().from(s.kidProfile),
+        kidProfileCategories: await tx.select().from(s.kidProfileCategory),
+        // never export secrets (device key hashes, PIN hash)
+        devices: (await tx.select().from(s.device)).map(({ keyHash: _k, ...d }) => d),
+        auditLog: await tx.select().from(s.auditLog),
+      }
+      await touch(tx, familyId, user.id, 'export', 'family', familyId)
+      return out
+    })
+    const doc = {
+      format: 'kiddietube-family-export',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      family: { id: fam.id, name: fam.name, createdAt: fam.createdAt },
+      members: members.map((m) => ({ ...m, role: toRole(m.role) })),
+      ...data,
+    }
+    const file = `kiddietube-${slugify(fam.name)}-${new Date().toISOString().slice(0, 10)}.json`
+    return reply.header('Content-Disposition', `attachment; filename="${file}"`).send(doc)
+  })
+
+  /**
+   * Permanently delete a family and everything in it (owner only). The body
+   * must repeat the family's name, so it can't happen by accident.
+   */
+  app.delete('/api/v1/families/:familyId', async (req, reply) => {
+    const { familyId } = z.object({ familyId: z.string() }).parse(req.params)
+    await requireMember(ctx, req, familyId, ['owner'])
+    const { confirmName } = z.object({ confirmName: z.string() }).parse(req.body ?? {})
+    const [fam] = await ctx.db.select({ name: s.organization.name }).from(s.organization).where(eq(s.organization.id, familyId))
+    if (!fam) throw notFound('Family not found')
+    if (confirmName.trim() !== fam.name) throw badRequest('Type the family’s exact name to confirm')
+    // Foreign keys cascade to every family-owned row (videos, categories,
+    // kid profiles, devices, PIN, audit log, members, invitations).
+    await ctx.db.delete(s.organization).where(eq(s.organization.id, familyId))
+    req.log.info({ familyId }, 'family deleted')
+    return reply.status(204).send()
+  })
+
   /* ------------------------------- members ------------------------------ */
 
   app.get('/api/v1/families/:familyId/members', async (req) => {

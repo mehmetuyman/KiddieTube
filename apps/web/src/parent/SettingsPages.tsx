@@ -1,7 +1,7 @@
 // Parent console: members, family settings and instance admin.
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { Family } from '@kiddietube/shared'
-import { api } from '../server/api'
+import { api, request } from '../server/api'
 import { clearPairing, getPairing } from '../server/device'
 import { THEMES, getTheme, setTheme, type ThemeId } from '../lib/theme'
 import { errorText } from './ParentConsole'
@@ -221,6 +221,55 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="pp-form">
+        <h3 className="pp-form-title">Your data</h3>
+        <p className="pc-muted">Download everything this family stores (videos, categories, kids, devices, parents, change history) as a file.</p>
+        <div>
+          <button
+            className="pp-btn pp-btn-ghost"
+            disabled={m.busy}
+            onClick={() =>
+              void m.run(async () => {
+                const res = await request<Response>('GET', `/api/v1/families/${familyId}/export`, undefined, { raw: true })
+                if (!res.ok) throw new Error(`Export failed (${res.status})`)
+                const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'kiddietube-export.json'
+                const url = URL.createObjectURL(await res.blob())
+                const a = Object.assign(document.createElement('a'), { href: url, download: name })
+                a.click()
+                URL.revokeObjectURL(url)
+              }, 'Export downloaded.')
+            }
+          >
+            Export family data
+          </button>
+        </div>
+        {role === 'owner' && (
+          <>
+            <p className="pc-muted">
+              Deleting the family permanently removes all of the above for every parent, and its devices stop working. Export first if you
+              might want it back.
+            </p>
+            <div>
+              <button
+                className="pp-btn pp-btn-danger"
+                disabled={m.busy}
+                onClick={() => {
+                  const typed = window.prompt(`This can’t be undone. Type the family name (“${family.name}”) to delete it:`)
+                  if (typed == null) return
+                  void m.run(async () => {
+                    await api.del(`/families/${familyId}`, { confirmName: typed })
+                    localStorage.removeItem('kt-family')
+                    window.location.assign(`${import.meta.env.BASE_URL}parent`)
+                  })
+                }}
+              >
+                Delete family…
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {pairing && (

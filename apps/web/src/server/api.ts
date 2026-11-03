@@ -63,7 +63,7 @@ export const api = {
   post: <T>(p: string, b?: unknown) => request<T>('POST', `${API_PREFIX}${p}`, b ?? {}),
   patch: <T>(p: string, b: unknown) => request<T>('PATCH', `${API_PREFIX}${p}`, b),
   put: <T>(p: string, b: unknown) => request<T>('PUT', `${API_PREFIX}${p}`, b),
-  del: <T = void>(p: string) => request<T>('DELETE', `${API_PREFIX}${p}`),
+  del: <T = void>(p: string, b?: unknown) => request<T>('DELETE', `${API_PREFIX}${p}`, b),
 }
 
 /** Better Auth endpoints (/api/auth/*). */

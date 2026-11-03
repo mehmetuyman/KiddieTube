@@ -269,3 +269,50 @@ describe('legacy list import format', () => {
     expect(doc.map((v) => v.id)).toEqual(['aaaaaaaaaaa'])
   })
 })
+
+describe('family export and deletion', () => {
+  it('exports only this family, without secrets; deletion needs the owner and the exact name, and removes everything', async () => {
+    const owner = new Client(h)
+    await owner.signIn(ADMIN_EMAIL)
+    const fam = (await owner.req('POST', '/api/v1/families', { name: 'Export Family' })).body.id
+    const cat = await owner.req('POST', `/api/v1/families/${fam}/categories`, { name: 'Songs', emoji: '🎵' })
+    await owner.req('POST', `/api/v1/families/${fam}/videos`, { url: 'kkkkkkkkkkk', categoryId: cat.body.id })
+    const kid = await owner.req('POST', `/api/v1/families/${fam}/profiles`, { name: 'Zeynep' })
+    const pair = await owner.req('POST', `/api/v1/families/${fam}/devices`, { kidProfileId: kid.body.id, name: 'Tab' })
+    await owner.req('PUT', `/api/v1/families/${fam}/pin`, { pin: '1357' })
+
+    const exp = await owner.req('GET', `/api/v1/families/${fam}/export`)
+    expect(exp.status).toBe(200)
+    expect(exp.headers['content-disposition']).toMatch(/attachment; filename="kiddietube-export-family-/)
+    expect(exp.body).toMatchObject({ format: 'kiddietube-family-export', family: { name: 'Export Family' } })
+    expect(exp.body.videos.map((v: { youtubeId: string }) => v.youtubeId)).toEqual(['kkkkkkkkkkk'])
+    expect(exp.body.devices[0]).not.toHaveProperty('keyHash')
+    const text = JSON.stringify(exp.body)
+    expect(text).not.toContain(pair.body.deviceKey)
+    expect(text).not.toContain('scrypt$')
+    expect(text).not.toContain('aaaaaaaaaaa') // another family's video
+
+    // a non-owner parent can export but not delete
+    const inv = await owner.req('POST', `/api/v1/families/${fam}/invitations`, { email: 'coparent@example.com' })
+    const co = new Client(h)
+    await co.signUp('coparent@example.com')
+    await co.req('POST', `/api/v1/invitations/${inv.body.id}/accept`)
+    expect((await co.req('GET', `/api/v1/families/${fam}/export`)).status).toBe(200)
+    expect((await co.req('DELETE', `/api/v1/families/${fam}`, { confirmName: 'Export Family' })).status).toBe(403)
+
+    expect((await owner.req('DELETE', `/api/v1/families/${fam}`, { confirmName: 'export family' })).status).toBe(400)
+    expect((await owner.req('DELETE', `/api/v1/families/${fam}`, { confirmName: 'Export Family' })).status).toBe(204)
+
+    // everything is gone, including rows only visible across families
+    const { withSystem } = await import('../db/context.ts')
+    const left = await withSystem(h.db.db, async (tx) => ({
+      videos: (await tx.select().from(s.video).where(sql`family_id = ${fam}`)).length,
+      devices: (await tx.select().from(s.device).where(sql`family_id = ${fam}`)).length,
+      audit: (await tx.select().from(s.auditLog).where(sql`family_id = ${fam}`)).length,
+      members: (await tx.select().from(s.member).where(sql`organization_id = ${fam}`)).length,
+    }))
+    expect(left).toEqual({ videos: 0, devices: 0, audit: 0, members: 0 })
+    expect((await new Client(h).req('GET', '/api/v1/feed', undefined, { authorization: `Device ${pair.body.deviceKey}` })).status).toBe(401)
+    expect((await owner.req('GET', '/api/v1/me')).body.families.some((f: { id: string }) => f.id === fam)).toBe(false)
+  })
+})
