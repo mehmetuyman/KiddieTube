@@ -51,6 +51,10 @@ export default defineConfig({
         // The app is a single page: unknown paths (/parent, /join, ...) get
         // index.html from the cache - but never API calls.
         navigateFallbackDenylist: [/\/api\//],
+        // Precache the app shell plus the Latin / Latin Extended (Turkish)
+        // font files, so an installed app looks right offline. Other
+        // alphabets download only if ever needed.
+        globPatterns: ['**/*.{js,css,html}', 'assets/*-latin-*.woff2'],
         // The seed list isn't precached (it must pick up new deploys), but keep
         // the last copy so an installed app still has videos when offline.
         runtimeCaching: [
