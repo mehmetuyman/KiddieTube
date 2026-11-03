@@ -1,6 +1,6 @@
 # Kiddie Tube — Roadmap: multi-family, self-hosted
 
-Status: **in progress** (Phase 0–1 done, see checklists) · Owner: Mehmet · Last updated: 2026-11-03
+Status: **in progress** — Phases 0–1 done; 2–4 partly (see checklists); go-live waits on DNS + Resend (§8) · Owner: Mehmet · Last updated: 2026-11-03
 
 This document is the plan for moving Kiddie Tube from a single-family static
 site (GitHub Pages + a GitHub Gist) to a small, self-hosted, multi-family
