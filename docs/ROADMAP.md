@@ -216,21 +216,21 @@ All input validated with zod schemas from `packages/shared`.
 - [x] "Update available" prompt; service worker caching review
 - [ ] Player refactor into React components + hooks (no DOM lookups by id);
       component tests
-- [ ] Stylesheet split per component (keep theme tokens); bundle fonts;
-      drop Bootstrap CDN
-- [ ] `docs/ARCHITECTURE.md`, `docs/RUNBOOK.md`, `CHANGELOG.md`
+- [ ] Stylesheet split per component (keep theme tokens)
+- [x] Bundle fonts; drop Bootstrap CDN (verified: no visual change)
+- [x] `docs/ARCHITECTURE.md`, runbook (`deploy/README.md`), `CHANGELOG.md`
 
 ### Phase 3 — Other families
-- [ ] Instance admin: invite families, list/disable families
-- [ ] Invitations by email (Resend, `noreply@tinyapps.dev`)
-- [ ] Parent roles (owner / parent); member management
-- [ ] Turkish / English UI (i18n); categories remain family-defined
-- [ ] Family data export + delete
+- [x] Instance admin: invite families, list families (disable: not yet)
+- [x] Invitations by email (Resend, `noreply@tinyapps.dev`)
+- [x] Parent roles (owner / parent); member management
+- [x] Turkish / English kids' UI (i18n; console still English); categories remain family-defined
+- [x] Family data export + delete
 - [ ] Onboarding: empty family → create first kid profile → add first videos
       (optional starter-pack suggestions, never copied from another family)
 
 ### Phase 4 — Extras (pick as needed)
-- [ ] Separate lists per kid profile
+- [x] Separate lists per kid profile (category restriction per profile)
 - [ ] Screen-time limits and bedtime lock
 - [ ] Parent-only watch history (opt-in)
 - [ ] Playlist import; nightly check for deleted/private videos
