@@ -15,11 +15,25 @@ interface State {
   pin: boolean
 }
 
+/** Remembered per family once the checklist is complete, so it stops loading. */
+const doneKey = (familyId: string) => `kt-getstarted-done-${familyId}`
+const isDone = (familyId: string) => {
+  try {
+    return localStorage.getItem(doneKey(familyId)) === '1'
+  } catch {
+    return false
+  }
+}
+
 export default function GetStarted({ familyId, path }: { familyId: string; path: string }) {
   const [s, setS] = useState<State | null>(null)
+  const done = isDone(familyId)
 
-  // re-check whenever the parent moves between pages (they may have just done a step)
+  // re-check whenever the parent moves between pages (they may have just done a
+  // step), until everything is done [review L8]
   useEffect(() => {
+    setS(null)
+    if (done) return
     let cancelled = false
     Promise.all([
       api.get<Category[]>(`/families/${familyId}/categories`),
@@ -28,15 +42,23 @@ export default function GetStarted({ familyId, path }: { familyId: string; path:
       api.get<Device[]>(`/families/${familyId}/devices`),
       api.get<{ set: boolean }>(`/families/${familyId}/pin`),
     ])
-      .then(([c, v, k, d, p]) => {
-        if (!cancelled)
-          setS({ categories: c.length, videos: v.length, kids: k.length, devices: d.filter((x) => !x.revoked).length, pin: p.set })
+      .then(([cats, v, k, d, p]) => {
+        if (cancelled) return
+        const next = { categories: cats.length, videos: v.length, kids: k.length, devices: d.filter((x) => !x.revoked).length, pin: p.set }
+        if (next.videos > 0 && next.kids > 0 && next.devices > 0) {
+          try {
+            localStorage.setItem(doneKey(familyId), '1')
+          } catch {
+            /* storage blocked: keep checking */
+          }
+        }
+        setS(next)
       })
       .catch(() => {}) // offline etc.: just don't show the checklist
     return () => {
       cancelled = true
     }
-  }, [familyId, path])
+  }, [familyId, path, done])
 
   if (!s || (s.videos > 0 && s.kids > 0 && s.devices > 0)) return null
 

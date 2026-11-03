@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_THEME, THEMES, applyTheme, getTheme, setTheme } from './theme'
 import indexHtml from '../../index.html?raw'
+import prepaint from '../../public/theme-prepaint.js?raw'
 
 beforeEach(() => {
   localStorage.clear()
@@ -45,9 +46,11 @@ describe('theme', () => {
     }
   })
 
-  it('index.html pre-paint script accepts exactly the theme ids', () => {
-    const m = indexHtml.match(/\/\^\(([^)]+)\)\$\//)
-    expect(m, 'theme id regex in index.html').toBeTruthy()
+  it('the pre-paint script is loaded from a file (no inline script, for the CSP) and accepts exactly the theme ids', () => {
+    expect(indexHtml).toContain('<script src="/theme-prepaint.js"></script>')
+    expect(indexHtml).not.toMatch(/<script>/)
+    const m = prepaint.match(/\/\^\(([^)]+)\)\$\//)
+    expect(m, 'theme id regex in theme-prepaint.js').toBeTruthy()
     expect(m![1].split('|').sort()).toEqual([...THEMES.map((t) => t.id)].sort())
   })
 })

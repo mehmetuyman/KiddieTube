@@ -9,14 +9,14 @@ import { betterAuth } from 'better-auth'
 import { langOf } from './lib/i18n.ts'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { and, eq, gt, isNull } from 'drizzle-orm'
-import type { Config } from './config.ts'
+import { isInstanceAdmin, type Config } from './config.ts'
 import type { Db } from './db/client.ts'
 import { withSystem } from './db/context.ts'
 import * as schema from './db/schema.ts'
 import { emails, type Mailer } from './email.ts'
 
 export function createAuth(db: Db, config: Config, mailer: Mailer) {
-  const isAdminEmail = (email: string) => config.adminEmails.includes(email.toLowerCase())
+  const isAdminEmail = (email: string) => isInstanceAdmin(config, email)
 
   async function mayRegister(email: string): Promise<boolean> {
     if (isAdminEmail(email)) return true
@@ -68,11 +68,23 @@ export function createAuth(db: Db, config: Config, mailer: Mailer) {
       enabled: true,
       minPasswordLength: 10,
       maxPasswordLength: 128,
-      autoSignIn: true,
+      // The address must be proven before the account can sign in, so nobody
+      // can claim the admin's or an invited parent's email [review H1].
+      requireEmailVerification: true,
+      autoSignIn: false,
       resetPasswordTokenExpiresIn: 60 * 60,
       revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, url }, request) => {
         await mailer.send(emails.passwordReset(user.email, url, langOf(request?.headers)))
+      },
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: true, // signing in unverified re-sends the link
+      autoSignInAfterVerification: true,
+      expiresIn: 60 * 60 * 24, // 1 day
+      sendVerificationEmail: async ({ user, url }, request) => {
+        await mailer.send(emails.verifyEmail(user.email, url, langOf(request?.headers)))
       },
     },
     session: {
@@ -90,7 +102,7 @@ export function createAuth(db: Db, config: Config, mailer: Mailer) {
       useSecureCookies: config.BASE_URL.startsWith('https://'),
       // nginx (deploy/nginx/kiddietube.conf) sets these to the real client IP;
       // used for per-client rate limits on sign-in and password reset
-      ipAddress: { ipAddressHeaders: ['x-real-ip', 'x-forwarded-for'] },
+      ipAddress: { ipAddressHeaders: ['x-real-ip'] },
     },
     databaseHooks: {
       user: {
@@ -98,7 +110,8 @@ export function createAuth(db: Db, config: Config, mailer: Mailer) {
           before: async (user) => {
             const email = user.email.toLowerCase()
             if (!(await mayRegister(email))) return false // invite-only
-            return { data: { ...user, email, isAdmin: isAdminEmail(email) } }
+            // admin rights are not stored: requireAdmin checks ADMIN_EMAILS on every request
+            return { data: { ...user, email } }
           },
         },
       },

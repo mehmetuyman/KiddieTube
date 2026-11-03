@@ -62,7 +62,7 @@ const safeJson = (s: string): unknown => {
 
 export const api = {
   get: <T>(p: string) => request<T>('GET', `${API_PREFIX}${p}`),
-  post: <T>(p: string, b?: unknown) => request<T>('POST', `${API_PREFIX}${p}`, b ?? {}),
+  post: <T>(p: string, b?: unknown, opts?: { timeoutMs?: number }) => request<T>('POST', `${API_PREFIX}${p}`, b ?? {}, opts),
   patch: <T>(p: string, b: unknown) => request<T>('PATCH', `${API_PREFIX}${p}`, b),
   put: <T>(p: string, b: unknown) => request<T>('PUT', `${API_PREFIX}${p}`, b),
   del: <T = void>(p: string, b?: unknown) => request<T>('DELETE', `${API_PREFIX}${p}`, b),
@@ -71,7 +71,9 @@ export const api = {
 /** Better Auth endpoints (/api/auth/*). */
 export const authApi = {
   signIn: (email: string, password: string) => request('POST', '/api/auth/sign-in/email', { email, password }),
-  signUp: (email: string, password: string, name: string) => request('POST', '/api/auth/sign-up/email', { email, password, name }),
+  /** The confirmation email links back to `callbackPath` (relative to the base). */
+  signUp: (email: string, password: string, name: string, callbackPath: string) =>
+    request('POST', '/api/auth/sign-up/email', { email, password, name, callbackURL: `${base}${callbackPath}` }),
   signOut: () => request('POST', '/api/auth/sign-out', {}),
   requestReset: (email: string) =>
     request('POST', '/api/auth/request-password-reset', { email, redirectTo: `${base}/reset-password` }),

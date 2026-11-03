@@ -83,6 +83,25 @@ export async function syncFeed(timeoutMs = 4000): Promise<{ result: SyncResult; 
 }
 
 /** Ask the server whether `pin` is this family's parent PIN (via the device key). */
+/**
+ * Retire a pairing on the server (a signed-in parent of that family is
+ * needed). Best effort: a 404 (already gone) or a family the parent isn't in
+ * is ignored.
+ */
+export async function revokeDevice(p: Pick<Pairing, 'familyId' | 'deviceId'>): Promise<void> {
+  await request('POST', `${API_PREFIX}/families/${p.familyId}/devices/${p.deviceId}/revoke`, {}).catch(() => {})
+}
+
+/** Does this device's family have a parent PIN? (Throws when the server can't say.) */
+export async function devicePinIsSet(): Promise<boolean> {
+  const p = getPairing()
+  if (!p) return false
+  const r = await request<{ set: boolean }>('GET', `${API_PREFIX}/device/pin`, undefined, {
+    headers: { authorization: `Device ${p.key}` },
+  })
+  return r.set
+}
+
 export async function verifyPinWithDevice(pin: string): Promise<boolean> {
   const p = getPairing()
   if (!p) return true

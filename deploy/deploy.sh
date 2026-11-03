@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deploy Kiddie Tube on the home server (run as ubuntu, from anywhere):
 #   /opt/kiddietube/deploy/deploy.sh            # deploy origin/master
-#   /opt/kiddietube/deploy/deploy.sh <git-ref>   # deploy a tag/commit
+#   /opt/kiddietube/deploy/deploy.sh <git-ref>   # a tag, commit or origin/<branch>
 #
 # Steps: fetch -> checkout -> npm ci -> API tests -> build web into a new
 # folder -> migrate DB -> swap web build -> restart API -> health check.
@@ -51,13 +51,18 @@ rm -rf apps/web/dist.next
 (cd apps/web && VITE_SERVER_MODE=true BASE_PATH=/ npx vite build --outDir dist.next)
 log "Web app built"
 
-set -a; . "$APP/.env"; set +a
-# Migrations only go forward: keep a restorable copy from just before them.
+# .env is NOT sourced by bash: values such as `Kiddie Tube <noreply@...>` are
+# fine for systemd and Node but are shell syntax [review K3]. Read only the
+# one value the shell needs; Node reads the file itself (--env-file).
+DATABASE_URL=$(grep -E '^DATABASE_URL=' "$APP/.env" | tail -n 1 | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/')
+[ -n "$DATABASE_URL" ] || { log "DATABASE_URL missing in $APP/.env"; false; }
+# Migrations only go forward: keep a restorable copy from just before them
+# (deploy/README.md "Restore" says how to use it).
 mkdir -p /var/backups/kiddietube
 pg_dump -Fc "$DATABASE_URL" > "/var/backups/kiddietube/pre-deploy-$(date +%Y%m%d-%H%M%S).dump"
 ls -1t /var/backups/kiddietube/pre-deploy-*.dump | tail -n +6 | xargs -r rm -f
 log "Pre-deploy database backup taken"
-npm run db:migrate -w @kiddietube/api
+(cd apps/api && NODE_ENV=production node --env-file="$APP/.env" --import tsx src/db/migrate.ts)
 log "Database migrated"
 
 rm -rf apps/web/dist.prev

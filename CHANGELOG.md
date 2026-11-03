@@ -28,6 +28,27 @@ The GitHub Pages build keeps working as before.
   - **One-time import** of the existing list (Gist or `videos.json`) into
     one family.
 - **"New version — Update" banner:** updates wait for a tap.
+- **Security review fixes** (`docs/CODE_REVIEW_2026-11-03_multi-family.md`):
+  - The parent-PIN gate on kids' devices actually asks for the PIN, and fails
+    closed (K1).
+  - Pairing signs the parent out on the kid's device (K2).
+  - Sign-up confirms the email address; admin rights need a confirmed
+    address and follow `ADMIN_EMAILS` live (H1, L6).
+  - Real client IPs behind Cloudflare; spoofed `X-Forwarded-For` is ignored
+    (H2).
+  - Parallel PIN guesses can't race the lockout (H3).
+  - Bulk import: YouTube lookups outside DB transactions, 4 at a time, at most
+    50 links, longer timeouts (M1).
+  - Accepting an invitation is atomic; one membership per person per family
+    (M2, migration `0003`).
+  - Sign-in returns to the invitation page (M3).
+  - The nightly check stops instead of hiding everything when YouTube
+    throttles (M4).
+  - Unpairing or re-pairing revokes the old device key (M5).
+  - Smaller fixes L1–L12: empty updates are 400, duplicate races are 409,
+    single-escaped emails, no inline script (CSP), dedicated service user,
+    and more.
+  - Deploy: `.env` is no longer sourced by bash (K3); restore notes (L7).
 - **Turkish and English everywhere,** chosen per device (defaults to the
   device language; switchable in the console header, Settings, and the
   on-device panel's Theme tab): kids' page, parent console, on-device parent

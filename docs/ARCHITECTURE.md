@@ -60,16 +60,28 @@ The kids' experience (grid, player, categories, themes, language) is shared.
 - `withSystem()` (cross-family) is used only to resolve a device key and for
   instance-admin lists (names and sizes, never content).
 - **Parents:** email + password (Better Auth), HttpOnly session cookies,
-  rate-limited sign-in, password reset by email. **Invite-only** sign-up.
+  rate-limited sign-in, password reset by email. **Invite-only** sign-up, and
+  the email address must be **confirmed** (link by email) before the account
+  can sign in, so nobody can claim an admin's or an invited parent's address.
 - **Kids:** no accounts. A device is **paired** to a kid profile; it holds a
   random 256-bit key (stored server-side only as SHA-256) and sends it as
   `Authorization: Device <key>`. Revoking stops it immediately.
-- **Parent PIN:** scrypt-hashed; 5 misses lock it for 5 minutes. Gates the
-  console on kids' devices.
+- **Kids' devices and the console (the model):** the console always needs a
+  parent **signed in**. Pairing a device **signs the parent out on that
+  device**, so a kid's device holds only its device key, which can read that
+  kid's feed and nothing else. The **parent PIN** (scrypt-hashed; 5 misses lock
+  it, longer each time; guesses are serialised with a row lock) is an extra
+  gate on the kids' page in front of the console's sign-in screen. The gate
+  fails closed: the console opens only when the server says there is no PIN
+  or the PIN is right.
 - **Instance admin** (`ADMIN_EMAILS`) invites people to create their *own*
-  family and is not a member of it.
+  family and is not a member of it. Admin rights are worked out on every
+  request from `ADMIN_EMAILS` and a confirmed email; they are never stored.
+- **Client IPs** for rate limits: nginx takes the visitor IP from Cloudflare's
+  `CF-Connecting-IP` (only from Cloudflare's ranges) and overwrites
+  `X-Forwarded-For`; the API trusts only `127.0.0.1` as a proxy.
 - Every change is written to `audit_log` and bumps the family's feed version.
-- nginx sets CSP (self + YouTube only), HSTS etc.; the API adds helmet
+- nginx sets CSP (self + YouTube only, no inline scripts), HSTS etc.; the API adds helmet
   headers, rate limits, uniform errors without stack traces, and redacts
   credentials from logs.
 
@@ -77,7 +89,8 @@ The kids' experience (grid, player, categories, themes, language) is shared.
 
 **Pairing a device:** a parent signs in on the kid's device → Kids → *Use this
 device* → `POST /families/:id/devices` returns the key once → stored with the
-pairing on the device → first feed sync.
+pairing on the device (a previous pairing of the same device is revoked) →
+first feed sync → the parent is signed out on that device.
 
 **Offline-first feed:** the kids' page renders the stored feed immediately,
 then `GET /api/v1/feed` with `If-None-Match` (4 s timeout) on open, on return

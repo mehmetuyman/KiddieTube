@@ -1,13 +1,14 @@
 // Parent console pages for a family's content: videos, categories, kid
 // profiles (with pairing this device) and devices.
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { Category, Device, KidProfile, PairResult, Role, Video } from '@kiddietube/shared'
-import { api } from '../server/api'
-import { getPairing, savePairing, syncFeed } from '../server/device'
+import { api, authApi } from '../server/api'
+import { getPairing, revokeDevice, savePairing, syncFeed } from '../server/device'
 import { THEMES } from '../lib/theme'
 import { thumbUrl } from '../lib/videoStore'
 import { errorText, type Me } from './ParentConsole'
 import { c, fmtDateTime } from './strings'
+import { IMPORT_MAX_LINKS } from '@kiddietube/shared/constants'
 import { themeName } from '../lib/i18n'
 
 export interface PageProps {
@@ -16,26 +17,36 @@ export interface PageProps {
   me: Me
 }
 
-/** Load/refresh helper with error + busy state shared by the pages. */
-function useResource<T>(load: () => Promise<T>, deps: unknown[]) {
+/**
+ * Load/refresh helper with error state, shared by the pages. Switching family
+ * clears the old data at once, and a slow answer for the previous family is
+ * ignored, so one family's data never shows under another [review L12].
+ */
+export function useResource<T>(load: () => Promise<T>, deps: unknown[]) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const seq = useRef(0)
   const reload = useCallback(async () => {
+    const mine = ++seq.current
     try {
-      setData(await load())
+      const d = await load()
+      if (mine !== seq.current) return
+      setData(d)
       setError(null)
     } catch (e) {
-      setError(errorText(e))
+      if (mine === seq.current) setError(errorText(e))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
   useEffect(() => {
+    setData(null)
+    setError(null)
     void reload()
   }, [reload])
   return { data, error, setError, reload }
 }
 
-function useAction() {
+export function useAction() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -240,12 +251,15 @@ function AddVideos({
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (many) {
-      const urls = url.split(/\s+/).filter(Boolean)
+      const urls = [...new Set(url.split(/\s+/).filter(Boolean))]
+      if (urls.length > IMPORT_MAX_LINKS) return act.setError(c.tooManyLinks(IMPORT_MAX_LINKS))
       await act.run(async () => {
-        const r = await api.post<{ results: { url: string; ok: boolean; error?: string }[] }>(`/families/${familyId}/videos/import`, {
-          urls,
-          categoryId,
-        })
+        // each link is looked up on YouTube: allow up to 2 minutes
+        const r = await api.post<{ results: { url: string; ok: boolean; error?: string }[] }>(
+          `/families/${familyId}/videos/import`,
+          { urls, categoryId },
+          { timeoutMs: 120_000 },
+        )
         setResults(r.results)
       })
       return
@@ -260,8 +274,8 @@ function AddVideos({
       <section className="pp-form">
         <h3 className="pp-form-title">{c.importResults}</h3>
         <ul className="pc-results">
-          {results.map((r) => (
-            <li key={r.url} className={r.ok ? 'ok' : 'fail'}>
+          {results.map((r, i) => (
+            <li key={i} className={r.ok ? 'ok' : 'fail'}>
               {r.ok ? '✓' : '✗'} {r.url} {r.error && <small>— {r.error}</small>}
             </li>
           ))}
@@ -301,7 +315,7 @@ function AddVideos({
           {c.cancel}
         </button>
         <button className="pp-btn pp-btn-primary" disabled={act.busy}>
-          {act.busy ? c.adding : many ? c.import : c.add}
+          {act.busy ? (many ? c.importing : c.adding) : many ? c.import : c.add}
         </button>
       </div>
     </form>
@@ -464,14 +478,27 @@ export function ProfilesPage({ familyId }: PageProps) {
   const [editing, setEditing] = useState<KidProfile | 'new' | null>(null)
   const pairing = getPairing()
 
-  const pairThisDevice = (p: KidProfile) =>
-    act.run(async () => {
-      const name = window.prompt(c.nameDevicePrompt, c.defaultDeviceName(p.name))
-      if (!name) return
+  /**
+   * Pair the device in hand. Afterwards the parent is signed out HERE: it's
+   * the kid's device now, and a parent session left on it would let the kid
+   * into the console past the PIN [review K2]. The device's previous pairing
+   * (if any) is revoked so it doesn't stay active on the server [review M5].
+   */
+  const pairThisDevice = async (p: KidProfile) => {
+    const name = window.prompt(c.nameDevicePrompt, c.defaultDeviceName(p.name))
+    if (!name) return
+    const ok = await act.run(async () => {
+      const previous = getPairing()
       const r = await api.post<PairResult>(`/families/${familyId}/devices`, { kidProfileId: p.id, name })
       savePairing({ deviceId: r.device.id, familyId, kidProfileId: p.id, key: r.deviceKey, name })
+      if (previous) await revokeDevice(previous)
       await syncFeed()
-    }, c.pairedNotice(p.name))
+    })
+    if (!ok) return
+    await authApi.signOut().catch(() => {})
+    window.alert(c.pairedSignedOut(p.name))
+    window.location.assign(import.meta.env.BASE_URL)
+  }
 
   if (editing)
     return (

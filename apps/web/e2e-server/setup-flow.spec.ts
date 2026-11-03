@@ -1,4 +1,20 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from '../e2e/fixtures'
+
+/** Open the newest confirmation link sent to `email` (dev outbox of the test API). */
+async function confirmEmail(page: Page, email: string) {
+  const mails: { to: string; text: string }[] = await (await page.request.get('./api/v1/dev/outbox')).json()
+  const mail = mails.filter((m) => m.to === email && /verify-email/.test(m.text)).pop()
+  expect(mail, `confirmation email for ${email}`).toBeTruthy()
+  await page.goto(/https?:\/\/\S+verify-email\S+/.exec(mail!.text)![0])
+}
+
+async function signIn(page: Page, email: string) {
+  await page.goto('./parent')
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Password').fill('correct-horse-battery')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+}
 
 // One story, in order: the instance admin's first visit through to a paired
 // kids' device that keeps working with the server unreachable.
@@ -12,6 +28,8 @@ test('admin creates a family, adds content, pairs a device; the kids page works 
   await page.getByLabel(/^Email/).fill('admin@example.com')
   await page.getByLabel(/^Password/).fill('correct-horse-battery')
   await page.getByRole('button', { name: 'Create account' }).click()
+  await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
+  await confirmEmail(page, 'admin@example.com') // signs in, back to /join, on to the console
 
   // 2. Create a family: it starts empty
   await page.getByLabel('Family name').fill('Test Family')
@@ -40,16 +58,37 @@ test('admin creates a family, adds content, pairs a device; the kids page works 
   await page.getByLabel('Name').fill('Ali')
   await page.getByRole('button', { name: 'Save' }).click()
   promptAnswer = 'Test tablet'
+  const alerted = page.waitForEvent('dialog', (d) => d.type() === 'alert')
   await page.getByRole('button', { name: 'Use this device' }).click()
-  await expect(page.locator('.pp-notice')).toContainText('This device now shows Ali’s videos')
-  await expect(page.locator('.pp-tag', { hasText: 'This device' })).toBeVisible()
+  expect((await alerted).message()).toContain('This device now shows Ali’s videos')
 
-  // 5. The kids' page shows the family's content
-  await page.getByRole('button', { name: '← Kids’ view' }).click()
+  // 5. The kids' page shows the family's content, and the parent was signed
+  //    out on this (now the kid's) device [review K2]
+  await expect(page.locator('.video-card-title')).toHaveText(['Video aaaaaaaaaaa'])
+  await page.goto('./parent')
+  await expect(page.getByRole('heading', { name: 'Parent sign-in' })).toBeVisible()
+
+  // 6. With a parent PIN set, opening the console from the kids' page asks for
+  //    it: a wrong PIN stays on the kids' page, the right one goes on [review K1]
+  await signIn(page, 'admin@example.com')
+  await page.locator('.pc-nav').getByRole('button', { name: /Settings/ }).click()
+  await page.getByPlaceholder('4–8 digits').fill('2468')
+  await page.getByRole('button', { name: 'Save PIN' }).click()
+  await expect(page.locator('.pp-notice')).toHaveText('Parent PIN set.')
+  const dialogs: string[] = []
+  page.on('dialog', (d) => void dialogs.push(`${d.type()}:${d.message()}`))
+  promptAnswer = '1111'
+  await page.goto('./?parent=1')
+  await expect.poll(() => dialogs).toEqual(['prompt:Parent PIN', 'alert:Wrong PIN'])
+  await expect(page.locator('.video-card-title')).toHaveText(['Video aaaaaaaaaaa'])
+  promptAnswer = '2468'
+  await page.goto('./?parent=1')
+  await expect(page.locator('.pc-nav')).toBeVisible()
+  await page.goto('./')
   await expect(page.locator('.video-card-title')).toHaveText(['Video aaaaaaaaaaa'])
   await expect(page.locator('.category-pill .category-name')).toHaveText(['All', 'Songs'])
 
-  // 6. Server unreachable (home server unplugged): still works from the device's copy
+  // 7. Server unreachable (home server unplugged): still works from the device's copy
   await page.route('**/api/**', (r) => r.abort())
   await page.reload()
   await expect(page.locator('.video-card-title')).toHaveText(['Video aaaaaaaaaaa'])
@@ -59,6 +98,12 @@ test('admin creates a family, adds content, pairs a device; the kids page works 
   // ...and the parent console says so instead of failing
   await page.goto('./parent')
   await expect(page.getByText('can’t be reached right now')).toBeVisible()
+
+  // ...and the kids' page won't open the console without the server's OK [review K1]
+  dialogs.length = 0
+  await page.goto('./?parent=1')
+  await expect.poll(() => dialogs.join()).toContain('can’t be reached right now')
+  await expect(page.locator('.video-card-title')).toHaveText(['Video aaaaaaaaaaa'])
 })
 
 test('an uninvited email cannot create an account', async ({ page }) => {

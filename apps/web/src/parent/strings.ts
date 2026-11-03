@@ -66,6 +66,9 @@ const en = {
   newPasswordTitle: 'Choose a new password',
   newPasswordLabel: 'New password (at least 10 characters)',
   savePassword: 'Save password',
+  checkEmailTitle: 'Check your email',
+  checkEmailText: (e: string) => `We sent a confirmation link to ${e}. Open it to finish creating your account; it brings you back here.`,
+  confirmLinkInvalid: 'That confirmation link is invalid or has expired. Sign in to get a new one.',
 
   // videos
   filter: 'Filter…',
@@ -86,6 +89,8 @@ const en = {
   confirmDelete: (x: string) => `Delete “${x}”?`,
   importResults: 'Import results',
   importSeveral: 'Import several links',
+  importing: 'Importing… (each link is looked up on YouTube)',
+  tooManyLinks: (n: number) => `Up to ${n} links at a time, please.`,
   addAVideo: 'Add a video',
   linksLabel: 'YouTube links (one per line)',
   linkLabel: 'YouTube link or video ID',
@@ -109,7 +114,8 @@ const en = {
   // kids
   nameDevicePrompt: 'Name this device (e.g. “Ali’s tablet”)',
   defaultDeviceName: (n: string) => `${n}’s device`,
-  pairedNotice: (n: string) => `This device now shows ${n}’s videos. It keeps working even when the server is offline.`,
+  pairedSignedOut: (n: string) =>
+    `This device now shows ${n}’s videos, and keeps working even when the server is offline. You’ve been signed out on this device so your kid can’t open the parent console; sign in again to manage the family.`,
   profilesIntro:
     'Each kid profile has its own list (all categories, or just the ones you pick). Pair the phone or tablet you’re holding with a profile using “Use this device”.',
   addKid: '+ Add kid',
@@ -155,6 +161,7 @@ const en = {
   pinDigitsPh: '4–8 digits',
   savePin: 'Save PIN',
   removePin: 'Remove PIN',
+  confirmRemovePin: 'Remove the parent PIN? Kids’ devices will then open the parent sign-in without asking.',
   themeThisDevice: 'Theme on this device',
   themeDeviceOnly: 'Saved on this device only; other devices keep their own.',
   yourData: 'Your data',
@@ -255,6 +262,9 @@ const tr: ConsoleStrings = {
   newPasswordTitle: 'Yeni bir şifre belirleyin',
   newPasswordLabel: 'Yeni şifre (en az 10 karakter)',
   savePassword: 'Şifreyi kaydet',
+  checkEmailTitle: 'E-postanızı kontrol edin',
+  checkEmailText: (e) => `${e} adresine bir onay bağlantısı gönderdik. Hesabınızı tamamlamak için açın; sizi buraya geri getirir.`,
+  confirmLinkInvalid: 'Bu onay bağlantısı geçersiz ya da süresi dolmuş. Yenisini almak için giriş yapın.',
 
   filter: 'Ara…',
   addVideo: '+ Video ekle',
@@ -274,6 +284,8 @@ const tr: ConsoleStrings = {
   confirmDelete: (x) => `“${x}” silinsin mi?`,
   importResults: 'İçe aktarma sonuçları',
   importSeveral: 'Birden çok bağlantı içe aktar',
+  importing: 'İçe aktarılıyor… (her bağlantı YouTube’da aranıyor)',
+  tooManyLinks: (n) => `Lütfen tek seferde en fazla ${n} bağlantı ekleyin.`,
   addAVideo: 'Video ekle',
   linksLabel: 'YouTube bağlantıları (her satıra bir tane)',
   linkLabel: 'YouTube bağlantısı ya da video kimliği',
@@ -295,7 +307,8 @@ const tr: ConsoleStrings = {
 
   nameDevicePrompt: 'Bu cihaza bir ad verin (ör. “Ali’nin tableti”)',
   defaultDeviceName: (n) => `${n} – cihaz`,
-  pairedNotice: (n) => `Bu cihaz artık ${n} için seçilen videoları gösteriyor. Sunucu kapalıyken de çalışmaya devam eder.`,
+  pairedSignedOut: (n) =>
+    `Bu cihaz artık ${n} için seçilen videoları gösteriyor ve sunucu kapalıyken de çalışmaya devam eder. Çocuğunuz ebeveyn paneline giremesin diye bu cihazda oturumunuz kapatıldı; aileyi yönetmek için yeniden giriş yapın.`,
   profilesIntro:
     'Her çocuk profilinin kendi listesi vardır (tüm kategoriler ya da yalnızca seçtikleriniz). Elinizdeki telefonu ya da tableti “Bu cihazda kullan” ile bir profile bağlayın.',
   addKid: '+ Çocuk ekle',
@@ -338,6 +351,7 @@ const tr: ConsoleStrings = {
   pinDigitsPh: '4–8 hane',
   savePin: 'PIN’i kaydet',
   removePin: 'PIN’i kaldır',
+  confirmRemovePin: 'Ebeveyn PIN’i kaldırılsın mı? Çocukların cihazları ebeveyn girişini artık sormadan açar.',
   themeThisDevice: 'Bu cihazdaki tema',
   themeDeviceOnly: 'Yalnızca bu cihaza kaydedilir; diğer cihazlar kendi temasını korur.',
   yourData: 'Verileriniz',

@@ -58,8 +58,20 @@ export class Client {
     return { status: res.statusCode, body: res.body ? safeJson(res.body) : null, headers: res.headers }
   }
 
-  signUp(email: string, name = email.split('@')[0]) {
-    return this.req('POST', '/api/auth/sign-up/email', { email, password: PASSWORD, name })
+  /** Sign up and, when accepted, open the confirmation link from the email (which signs in). */
+  async signUp(email: string, name = email.split('@')[0]) {
+    const r = await this.req('POST', '/api/auth/sign-up/email', { email, password: PASSWORD, name })
+    if (r.status === 200) {
+      const link = this.h.outbox.findLast((m) => m.to === email && /verify-email/.test(m.text))
+      if (!link) throw new Error(`no confirmation email for ${email}`)
+      await this.verify(link.text)
+    }
+    return r
+  }
+  /** Open the confirmation link found in an email body. */
+  async verify(text: string) {
+    const url = new URL(/https?:\/\/\S+verify-email\S+/.exec(text)![0])
+    return this.req('GET', url.pathname + url.search)
   }
   signIn(email: string, password = PASSWORD) {
     return this.req('POST', '/api/auth/sign-in/email', { email, password })

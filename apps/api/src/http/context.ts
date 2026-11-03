@@ -4,7 +4,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm'
 import type { FastifyRequest } from 'fastify'
 import type { Role } from '@kiddietube/shared'
 import type { Auth } from '../auth.ts'
-import type { Config } from '../config.ts'
+import { isInstanceAdmin, type Config } from '../config.ts'
 import type { Db } from '../db/client.ts'
 import { withSystem, type Tx } from '../db/context.ts'
 import * as s from '../db/schema.ts'
@@ -32,8 +32,10 @@ export interface SessionUser {
 export async function requireUser(ctx: AppContext, req: FastifyRequest): Promise<SessionUser> {
   const session = await ctx.auth.api.getSession({ headers: fromNodeHeaders(req.headers) })
   if (!session) throw unauthorized()
-  const u = session.user as typeof session.user & { isAdmin?: boolean }
-  return { id: u.id, email: u.email, name: u.name, isAdmin: !!u.isAdmin }
+  const u = session.user
+  // Derived on every request (not stored), so removing an address from
+  // ADMIN_EMAILS takes effect at once; only a verified address counts.
+  return { id: u.id, email: u.email, name: u.name, isAdmin: u.emailVerified && isInstanceAdmin(ctx.config, u.email) }
 }
 
 export async function requireAdmin(ctx: AppContext, req: FastifyRequest): Promise<SessionUser> {

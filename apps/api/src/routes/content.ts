@@ -2,9 +2,11 @@
 // Every handler checks membership, then runs inside withFamily() so
 // row-level security confines it to that family's rows.
 import { asc, desc, eq, inArray, sql } from 'drizzle-orm'
-import { langOf, translate } from '../lib/i18n.ts'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { isUniqueViolation } from '../db/errors.ts'
+import { langOf, translate } from '../lib/i18n.ts'
+import { mapLimit } from '../lib/async.ts'
 import {
   createCategoryBody,
   createKidProfileBody,
@@ -159,39 +161,68 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
     )
   })
 
-  async function addVideo(tx: Tx, familyId: string, userId: string, url: string, title?: string, categoryId?: string | null) {
-    const youtubeId = parseYouTubeId(url)
-    if (!youtubeId) throw badRequest('Not a YouTube link or video id')
-    const existing = await tx.select({ id: s.video.id }).from(s.video).where(eq(s.video.youtubeId, youtubeId)).limit(1)
-    if (existing.length) throw conflict('That video is already in the list')
+  const DUPLICATE = 'That video is already in the list'
+
+  async function existingYoutubeIds(familyId: string, ids: string[]): Promise<Set<string>> {
+    if (!ids.length) return new Set()
+    const rows = await withFamily(ctx.db, familyId, (tx) =>
+      tx.select({ y: s.video.youtubeId }).from(s.video).where(inArray(s.video.youtubeId, ids)),
+    )
+    return new Set(rows.map((r) => r.y))
+  }
+
+  /**
+   * Resolve a link to an insertable video. The YouTube lookup happens here,
+   * outside any database transaction, so a slow lookup never holds a pooled
+   * connection open.
+   */
+  async function prepareVideo(youtubeId: string, title?: string) {
     const meta = await ctx.fetchMeta(youtubeId)
     const finalTitle = title?.trim() || meta?.title || ''
     if (!finalTitle) throw badRequest('Could not find this video (private, deleted or not embeddable?). Enter a title to add it anyway.')
-    const [r] = await tx
-      .insert(s.video)
-      .values({
-        id: newId('vid_'),
-        familyId,
-        youtubeId,
-        title: finalTitle,
-        channel: meta?.channel || null,
-        categoryId: categoryId ?? null,
-        // 'unavailable' is only set by an explicit availability check, never
-        // because a lookup failed (e.g. a brief network problem)
-        status: 'ok',
-        addedBy: userId,
-      })
-      .returning()
-    return r
+    return { youtubeId, title: finalTitle, channel: meta?.channel || null }
+  }
+
+  async function insertVideo(
+    tx: Tx,
+    familyId: string,
+    userId: string,
+    v: { youtubeId: string; title: string; channel: string | null },
+    categoryId?: string | null,
+  ) {
+    try {
+      const [r] = await tx
+        .insert(s.video)
+        .values({
+          id: newId('vid_'),
+          familyId,
+          ...v,
+          categoryId: categoryId ?? null,
+          // 'unavailable' is only set by an explicit availability check, never
+          // because a lookup failed (e.g. a brief network problem)
+          status: 'ok',
+          addedBy: userId,
+        })
+        .returning()
+      return r
+    } catch (e) {
+      // two parents adding the same link at the same moment
+      if (isUniqueViolation(e)) throw conflict(DUPLICATE)
+      throw e
+    }
   }
 
   app.post(`${base}/videos`, async (req, reply) => {
     const { familyId } = params.parse(req.params)
     const { user } = await requireMember(ctx, req, familyId)
     const body = createVideoBody.parse(req.body)
+    const youtubeId = parseYouTubeId(body.url)
+    if (!youtubeId) throw badRequest('Not a YouTube link or video id')
+    if ((await existingYoutubeIds(familyId, [youtubeId])).size) throw conflict(DUPLICATE)
+    const v = await prepareVideo(youtubeId, body.title)
     const row = await withFamily(ctx.db, familyId, async (tx) => {
       await assertCategories(tx, [body.categoryId])
-      const r = await addVideo(tx, familyId, user.id, body.url, body.title, body.categoryId)
+      const r = await insertVideo(tx, familyId, user.id, v, body.categoryId)
       await touch(tx, familyId, user.id, 'create', 'video', r.id, { youtubeId: r.youtubeId })
       return r
     })
@@ -203,18 +234,45 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
     const { familyId } = params.parse(req.params)
     const { user } = await requireMember(ctx, req, familyId)
     const body = importVideosBody.parse(req.body)
+    await withFamily(ctx.db, familyId, (tx) => assertCategories(tx, [body.categoryId]))
+    const lang = langOf(req.headers)
+    const fail = (url: string, message: string) => ({ url, ok: false as const, error: translate(message, lang) })
+
+    // Same link pasted twice: report it once.
+    const urls = [...new Set(body.urls)]
+    const ids = urls.map((u) => parseYouTubeId(u))
+    const existing = await existingYoutubeIds(familyId, ids.filter((x): x is string => !!x))
+    const seen = new Set<string>()
+
+    // Lookups first, a few at a time and outside any transaction...
+    const prepared = await mapLimit(urls, 4, async (url, i) => {
+      const youtubeId = ids[i]
+      if (!youtubeId) return fail(url, 'Not a YouTube link or video id')
+      if (existing.has(youtubeId) || seen.has(youtubeId)) return fail(url, DUPLICATE)
+      seen.add(youtubeId)
+      try {
+        return { url, ok: true as const, v: await prepareVideo(youtubeId) }
+      } catch (e) {
+        return fail(url, (e as Error).message)
+      }
+    })
+
+    // ...then one short transaction per video.
     const results: { url: string; ok: boolean; video?: Video; error?: string }[] = []
-    for (const url of body.urls) {
+    for (const p of prepared) {
+      if (!p.ok) {
+        results.push(p)
+        continue
+      }
       try {
         const r = await withFamily(ctx.db, familyId, async (tx) => {
-          await assertCategories(tx, [body.categoryId])
-          const v = await addVideo(tx, familyId, user.id, url, undefined, body.categoryId)
-          await touch(tx, familyId, user.id, 'import', 'video', v.id, { youtubeId: v.youtubeId })
-          return v
+          const row = await insertVideo(tx, familyId, user.id, p.v, body.categoryId)
+          await touch(tx, familyId, user.id, 'import', 'video', row.id, { youtubeId: row.youtubeId })
+          return row
         })
-        results.push({ url, ok: true, video: toVideo(r) })
+        results.push({ url: p.url, ok: true, video: toVideo(r) })
       } catch (e) {
-        results.push({ url, ok: false, error: translate((e as Error).message, langOf(req.headers)) })
+        results.push(fail(p.url, (e as Error).message))
       }
     }
     return { results }
@@ -368,6 +426,14 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
     })
   })
 
+  /** For a paired device: does this family have a parent PIN? */
+  app.get('/api/v1/device/pin', async (req) => {
+    const d = await requireDevice(ctx, req)
+    return withFamily(ctx.db, d.familyId, async (tx) => ({
+      set: (await tx.select({ f: s.parentPin.familyId }).from(s.parentPin)).length > 0,
+    }))
+  })
+
   /**
    * Check the PIN a device asks for before opening parent mode. Used by
    * devices (device key) as well as parents; lockout after repeated misses.
@@ -383,7 +449,9 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
       await requireMember(ctx, req, familyId)
     }
     return withFamily(ctx.db, familyId, async (tx) => {
-      const [row] = await tx.select().from(s.parentPin)
+      // FOR UPDATE: parallel guesses wait for each other, so every miss is
+      // counted and the lockout can't be raced
+      const [row] = await tx.select().from(s.parentPin).for('update')
       if (!row) return { ok: true }
       if (row.lockedUntil && row.lockedUntil > new Date()) throw tooMany('Too many wrong PINs. Try again in a few minutes.')
       const ok = await verifyPinHash(pin, row.pinHash)

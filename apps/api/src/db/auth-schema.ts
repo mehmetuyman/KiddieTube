@@ -2,7 +2,7 @@
 // is a family. Column names follow Better Auth's defaults so its Drizzle
 // adapter can map them; verify with `npx @better-auth/cli generate` after
 // upgrading better-auth.
-import { boolean, index, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { boolean, index, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 const ts = (name: string) => timestamp(name, { withTimezone: true })
 
@@ -89,7 +89,12 @@ export const member = pgTable(
     role: text('role').notNull().default('member'),
     createdAt: ts('created_at').notNull().defaultNow(),
   },
-  (t) => [index('member_org_idx').on(t.organizationId), index('member_user_idx').on(t.userId)],
+  (t) => [
+    index('member_org_idx').on(t.organizationId),
+    index('member_user_idx').on(t.userId),
+    // one membership per person per family
+    uniqueIndex('member_org_user_uq').on(t.organizationId, t.userId),
+  ],
 )
 
 export const invitation = pgTable('invitation', {

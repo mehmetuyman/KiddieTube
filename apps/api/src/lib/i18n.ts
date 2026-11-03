@@ -70,6 +70,8 @@ const TR: Record<string, string> = {
   'User already exists.': 'Bu e-posta ile zaten bir hesap var.',
   'User already exists. Use another email.': 'Bu e-posta ile zaten bir hesap var.',
   'User not found': 'Kullanıcı bulunamadı.',
+  'Email not verified': 'E-posta adresiniz henüz onaylanmadı. Size yeni bir onay bağlantısı gönderdik.',
+  'Nothing to update': 'Değiştirilecek bir şey yok.',
   [INVITE_ONLY]: 'Bu e-posta kayıt olamaz. Davetin gönderildiği adresi tam olarak kullanın.',
 }
 

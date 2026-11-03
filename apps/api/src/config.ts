@@ -21,14 +21,26 @@ const schema = z.object({
   EMAIL_FROM: z.string().default('Kiddie Tube <noreply@tinyapps.dev>'),
   /** Comma-separated emails that are instance administrators. */
   ADMIN_EMAILS: z.string().default(''),
-  /** Set when running behind nginx so client IPs / https are read correctly. */
-  TRUST_PROXY: envBool(true),
+  /**
+   * Addresses of the reverse proxy whose X-Forwarded-* headers are believed
+   * (comma-separated IPs/CIDRs), or "false". Never "trust everyone": a client
+   * could then pick its own IP and dodge the rate limits [review H2].
+   */
+  TRUST_PROXY: z
+    .string()
+    .default('127.0.0.1')
+    .transform((v) => v.trim())
+    .refine((v) => v.toLowerCase() !== 'true', 'list the proxy addresses (e.g. 127.0.0.1) instead of "true"')
+    .transform((v) => (['', 'false', '0', 'no', 'off'].includes(v.toLowerCase()) ? false : v)),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   /** Tests/dev only: answer video lookups locally instead of calling YouTube. */
   FAKE_YOUTUBE_META: envBool(false),
 })
 
 export type Config = z.infer<typeof schema> & { adminEmails: string[] }
+
+/** An instance administrator per ADMIN_EMAILS (checked on every request, never stored). */
+export const isInstanceAdmin = (config: Pick<Config, 'adminEmails'>, email: string) => config.adminEmails.includes(email.toLowerCase())
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env)

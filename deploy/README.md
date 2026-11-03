@@ -9,9 +9,9 @@ done once by hand, then `deploy.sh` handles updates.
 |---|---|
 | Code | `/opt/kiddietube` (git clone) |
 | Secrets | `/opt/kiddietube/.env` (from `deploy/env.example`, `chmod 600`) |
-| API service | `kiddietube.service` → `127.0.0.1:3007` |
+| API service | `kiddietube.service` → `127.0.0.1:3007`, runs as the `kiddietube` system user |
 | Web app | `/opt/kiddietube/apps/web/dist` (static, served by nginx) |
-| nginx | `/etc/nginx/sites-available/kiddietube` + `snippets/kiddietube-headers.conf` |
+| nginx | `/etc/nginx/sites-available/kiddietube` + `snippets/kiddietube-headers.conf` + `snippets/kiddietube-cloudflare-realip.conf` |
 | Database | `kiddietube` DB, owned by the ordinary `kiddietube` user |
 | Deploy log | `/var/log/kiddietube-deploy.log` |
 | Nightly video check | `kiddietube-check.timer` → `journalctl -u kiddietube-check` |
@@ -19,10 +19,12 @@ done once by hand, then `deploy.sh` handles updates.
 
 ## Before you start (owner)
 
-1. **DNS:** in Cloudflare, add `kids` → same target as `tinyapps.dev`, proxied
-   (orange cloud).
-2. **Email:** verify `tinyapps.dev` in Resend (adds a few DNS records) so mail
-   can come from `noreply@tinyapps.dev`.
+1. **DNS:** done 2026-11-03: `kids` CNAME → `tinyapps.dev`, proxied. SSL/TLS
+   mode is **Full** (the origin certificate is self-signed; "Full (strict)"
+   would reject it).
+2. **Email:** `tinyapps.dev` must show **Verified** in Resend (its DNS records
+   are already in Cloudflare). Sign-up needs it: new accounts confirm their
+   email address before they can sign in.
 
 ## First-time setup
 
@@ -36,12 +38,13 @@ git clone git@github.com:mehmetuyman/KiddieTube.git /opt/kiddietube
 sudo -u postgres psql -v pw="'$(openssl rand -base64 24)'" -f /opt/kiddietube/deploy/setup-db.sql
 #    -> put that same password into DATABASE_URL in .env
 
-# 3. Secrets
+# 3. Secrets (values with spaces or <> in double quotes, like EMAIL_FROM)
 cp /opt/kiddietube/deploy/env.example /opt/kiddietube/.env
 chmod 600 /opt/kiddietube/.env
 nano /opt/kiddietube/.env      # DATABASE_URL, AUTH_SECRET (openssl rand -base64 48), RESEND_API_KEY
 
-# 4. Service
+# 4. Service, under its own unprivileged user (reads the code, can't change it)
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin kiddietube
 sudo cp /opt/kiddietube/deploy/kiddietube.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable kiddietube
@@ -52,7 +55,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now kiddietube-check.timer
 
 # 5. nginx
-sudo cp /opt/kiddietube/deploy/nginx/kiddietube-headers.conf /etc/nginx/snippets/
+sudo cp /opt/kiddietube/deploy/nginx/kiddietube-headers.conf /opt/kiddietube/deploy/nginx/kiddietube-cloudflare-realip.conf /etc/nginx/snippets/
 sudo cp /opt/kiddietube/deploy/nginx/kiddietube.conf /etc/nginx/sites-available/kiddietube
 sudo ln -s /etc/nginx/sites-available/kiddietube /etc/nginx/sites-enabled/kiddietube
 sudo nginx -t && sudo systemctl reload nginx
@@ -60,7 +63,8 @@ sudo nginx -t && sudo systemctl reload nginx
 # 6. Deploy log + first deploy (installs, tests, builds, migrates, starts)
 sudo touch /var/log/kiddietube-deploy.log && sudo chown ubuntu:ubuntu /var/log/kiddietube-deploy.log
 sudo mkdir -p /var/backups/kiddietube && sudo chown ubuntu:ubuntu /var/backups/kiddietube
-/opt/kiddietube/deploy/deploy.sh
+/opt/kiddietube/deploy/deploy.sh                              # master
+/opt/kiddietube/deploy/deploy.sh origin/feature/multi-family  # or a branch, to test it first
 ```
 
 `deploy.sh` restarts the service with `sudo systemctl restart kiddietube`; allow
@@ -70,7 +74,8 @@ that without a password if you want hands-off deploys:
 ## After the first deploy
 
 1. Open `https://kids.tinyapps.dev/join`, sign up with your `ADMIN_EMAILS`
-   address, create your family.
+   address, open the confirmation link in the email, then create your family.
+   (Admin rights need a confirmed address, so nobody else can claim it.)
 2. Import the current list into **your family only** (family id: Settings
    page, or `GET /api/v1/me`):
    ```bash
@@ -103,6 +108,13 @@ that without a password if you want hands-off deploys:
 
 ## Restore
 
+A failed deploy rolls back the **code** automatically, but not the
+**database**: migrations that already ran stay applied. Migrations are
+written to be backward-compatible with the previous release (add, don't
+rename or drop, in the same release), so the rolled-back code keeps working.
+If a migration itself is the problem, restore the dump `deploy.sh` took just
+before it:
+
 ```bash
 sudo systemctl stop kiddietube
 pg_restore --clean --if-exists -d "$DATABASE_URL" /var/backups/kiddietube/pre-deploy-<when>.dump
@@ -111,10 +123,12 @@ pg_restore --clean --if-exists -d "$DATABASE_URL" /var/backups/kiddietube/pre-de
 
 ## Notes
 
-- **Client IPs behind Cloudflare:** for per-client rate limits, nginx should
-  see the real client IP. Configure nginx's real-IP module for Cloudflare
-  (`set_real_ip_from` Cloudflare ranges, `real_ip_header CF-Connecting-IP`), so
-  `$remote_addr` is the visitor rather than Cloudflare.
+- **Client IPs behind Cloudflare:** `snippets/kiddietube-cloudflare-realip.conf`
+  makes `$remote_addr` the visitor (from `CF-Connecting-IP`, believed only from
+  Cloudflare's ranges). nginx overwrites `X-Forwarded-For`, and the API trusts
+  only `127.0.0.1` (`TRUST_PROXY`), so clients can't pick their own IP to
+  dodge rate limits. Refresh the ranges from https://www.cloudflare.com/ips/
+  now and then.
 - **Staging:** same steps with `kiddietube-staging` (service, port 3008, DB
   `kiddietube_staging`, host `kids-staging.tinyapps.dev`).
 - **Logs:** `journalctl -u kiddietube -f` (credentials are redacted).

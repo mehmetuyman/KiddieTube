@@ -10,7 +10,7 @@ import { applyTheme, hasSavedTheme } from './lib/theme'
 import { htmlLang, t } from './lib/i18n'
 import type { Category, Feed } from '@kiddietube/shared'
 import { SERVER_MODE } from './server/mode'
-import { getPairing, startFeedSync, verifyPinWithDevice } from './server/device'
+import { devicePinIsSet, getPairing, startFeedSync, verifyPinWithDevice } from './server/device'
 import { ApiRequestError } from './server/api'
 import { navigate, usePath } from './router'
 import UpdateBanner from './components/UpdateBanner'
@@ -200,18 +200,23 @@ function KidsPage() {
     setParentOpen(true)
   }
 
-  /** Server mode: PIN-gate the parent console on a paired device. */
+  /**
+   * Server mode: PIN-gate the parent console on a paired device. Fails
+   * closed: the console opens only after the server confirms there is no PIN
+   * or that the PIN is right [review K1]. (The console also needs a parent
+   * sign-in, which pairing ends on the kid's device [review K2].)
+   */
   async function openParentConsole() {
     if (!getPairing()) return navigate('/parent')
     try {
-      if (!(await verifyPinWithDevice(''))) {
+      if (await devicePinIsSet()) {
         const pin = window.prompt(t.parentPin)
         if (pin == null) return
         if (!(await verifyPinWithDevice(pin))) return void window.alert(t.wrongPin)
       }
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 429) return void window.alert(e.message)
-      // offline: the console itself explains that changes are paused
+      return void window.alert(e instanceof ApiRequestError && e.offline ? t.parentOffline : t.parentError)
     }
     navigate('/parent')
   }

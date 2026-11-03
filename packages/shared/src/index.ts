@@ -1,6 +1,7 @@
 // Types and validation shared by the web app and the API.
 // Every request body the API accepts is parsed with one of these schemas.
 import { z } from 'zod'
+import { IMPORT_MAX_LINKS } from './constants'
 
 /* ---------------------------------------------------------------- */
 /* YouTube                                                           */
@@ -97,7 +98,13 @@ export type Family = z.infer<typeof family>
 /* ---------------------------------------------------------------- */
 
 export const createCategoryBody = z.object({ name, emoji, color: color.nullable().optional() })
-export const updateCategoryBody = createCategoryBody.partial().extend({ sortOrder: z.number().int().optional() })
+/** At least one field must be given (an empty update is a client bug). */
+const nonEmpty = (b: Record<string, unknown>) => Object.values(b).some((v) => v !== undefined)
+
+export const updateCategoryBody = createCategoryBody
+  .partial()
+  .extend({ sortOrder: z.number().int().optional() })
+  .refine(nonEmpty, { message: 'Nothing to update' })
 export const reorderBody = z.object({ ids: z.array(id).min(1).max(500) })
 
 export const createVideoBody = z.object({
@@ -106,13 +113,15 @@ export const createVideoBody = z.object({
   title: z.string().trim().max(300).optional(),
   categoryId: id.nullable().optional(),
 })
-export const updateVideoBody = z.object({
-  title: z.string().trim().min(1).max(300).optional(),
-  categoryId: id.nullable().optional(),
-  hidden: z.boolean().optional(),
-})
+export const updateVideoBody = z
+  .object({
+    title: z.string().trim().min(1).max(300).optional(),
+    categoryId: id.nullable().optional(),
+    hidden: z.boolean().optional(),
+  })
+  .refine(nonEmpty, { message: 'Nothing to update' })
 export const importVideosBody = z.object({
-  urls: z.array(z.string().trim().min(1).max(500)).min(1).max(500),
+  urls: z.array(z.string().trim().min(1).max(500)).min(1).max(IMPORT_MAX_LINKS),
   categoryId: id.nullable().optional(),
 })
 
@@ -122,7 +131,7 @@ export const createKidProfileBody = z.object({
   defaultTheme: themeId.nullable().optional(),
   categoryIds: z.array(id).max(200).optional(),
 })
-export const updateKidProfileBody = createKidProfileBody.partial()
+export const updateKidProfileBody = createKidProfileBody.partial().refine(nonEmpty, { message: 'Nothing to update' })
 
 export const pairDeviceBody = z.object({ kidProfileId: id, name })
 export const setPinBody = z.object({ pin: z.string().regex(/^\d{4,8}$/, 'PIN must be 4–8 digits').nullable() })
@@ -160,4 +169,4 @@ export const apiError = z.object({
 })
 export type ApiError = z.infer<typeof apiError>
 
-export { API_PREFIX } from './constants'
+export { API_PREFIX, IMPORT_MAX_LINKS } from './constants'

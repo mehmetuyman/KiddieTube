@@ -181,12 +181,23 @@ export async function familyRoutes(app: FastifyInstance, ctx: AppContext) {
   app.post('/api/v1/invitations/:id/accept', async (req) => {
     const { id } = z.object({ id: z.string() }).parse(req.params)
     const user = await requireUser(ctx, req)
-    const [inv] = await ctx.db.select().from(s.invitation).where(eq(s.invitation.id, id))
-    if (!inv || inv.status !== 'pending' || inv.expiresAt < new Date()) throw notFound('Invitation not found or expired')
-    if (inv.email !== user.email.toLowerCase()) throw forbidden('This invitation was sent to a different email')
-    await ctx.db.transaction(async (tx) => {
-      await tx.update(s.invitation).set({ status: 'accepted' }).where(eq(s.invitation.id, id))
-      await tx.insert(s.member).values({ id: newId('mem_'), organizationId: inv.organizationId, userId: user.id, role: inv.role ?? 'member' })
+    const [found] = await ctx.db.select().from(s.invitation).where(eq(s.invitation.id, id))
+    if (!found || found.status !== 'pending' || found.expiresAt < new Date()) throw notFound('Invitation not found or expired')
+    if (found.email !== user.email.toLowerCase()) throw forbidden('This invitation was sent to a different email')
+    // Atomic and idempotent: only one request can flip it from pending (double
+    // clicks, two tabs), and someone already in the family isn't added twice.
+    const inv = await ctx.db.transaction(async (tx) => {
+      const [claimed] = await tx
+        .update(s.invitation)
+        .set({ status: 'accepted' })
+        .where(and(eq(s.invitation.id, id), eq(s.invitation.status, 'pending'), gt(s.invitation.expiresAt, new Date())))
+        .returning()
+      if (!claimed) throw notFound('Invitation not found or expired')
+      await tx
+        .insert(s.member)
+        .values({ id: newId('mem_'), organizationId: claimed.organizationId, userId: user.id, role: claimed.role ?? 'member' })
+        .onConflictDoNothing({ target: [s.member.organizationId, s.member.userId] })
+      return claimed
     })
     await withFamily(ctx.db, inv.organizationId, (tx) => touch(tx, inv.organizationId, user.id, 'join', 'member', user.id))
     const [fam] = await ctx.db.select({ name: s.organization.name }).from(s.organization).where(eq(s.organization.id, inv.organizationId))

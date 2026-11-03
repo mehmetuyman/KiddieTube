@@ -1,54 +1,13 @@
 // Parent console: members, family settings and instance admin.
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import type { Family } from '@kiddietube/shared'
 import { api, request } from '../server/api'
-import { clearPairing, getPairing } from '../server/device'
+import { clearPairing, getPairing, revokeDevice } from '../server/device'
 import { THEMES, getTheme, setTheme, type ThemeId } from '../lib/theme'
 import { themeName } from '../lib/i18n'
 import { c, fmtDate } from './strings'
 import { LanguageSelect } from './ParentConsole'
-import { errorText } from './ParentConsole'
-import type { PageProps } from './FamilyPages'
-
-function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {
-  const [data, setData] = useState<T | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const reload = useCallback(async () => {
-    try {
-      setData(await load())
-      setError(null)
-    } catch (e) {
-      setError(errorText(e))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
-  useEffect(() => {
-    void reload()
-  }, [reload])
-  return { data, error, reload }
-}
-
-function useMsg() {
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const run = async (fn: () => Promise<unknown>, done?: string) => {
-    setBusy(true)
-    setError(null)
-    setNotice(null)
-    try {
-      await fn()
-      if (done) setNotice(done)
-      return true
-    } catch (e) {
-      setError(errorText(e))
-      return false
-    } finally {
-      setBusy(false)
-    }
-  }
-  return { error, notice, busy, run }
-}
+import { useAction as useMsg, useResource as useLoad, type PageProps } from './FamilyPages'
 
 /* ------------------------------ members ----------------------------- */
 
@@ -177,6 +136,7 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
         onSubmit={(e) => {
           e.preventDefault()
           const p = pinInput.trim()
+          if (!p && !window.confirm(c.confirmRemovePin)) return // [review L10]
           void m.run(async () => {
             await api.put(`/families/${familyId}/pin`, { pin: p || null })
             setPinInput('')
@@ -286,8 +246,9 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
           <p className="pc-muted">{c.pairedAs(pairing.name)}</p>
           <button
             className="pp-btn pp-btn-danger"
-            onClick={() => {
+            onClick={async () => {
               if (!window.confirm(c.confirmUnpair)) return
+              await revokeDevice(pairing) // the old key stops working too [review M5]
               clearPairing()
               window.location.reload()
             }}

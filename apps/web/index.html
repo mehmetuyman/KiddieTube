@@ -5,14 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Kiddie Tube</title>
     <meta name="theme-color" content="#ffb938" />
-    <script>
-      // Apply this device's theme before first paint (see src/lib/theme.ts).
-      (function () {
-        var t
-        try { t = localStorage.getItem('kiddietube-theme') } catch (e) {}
-        document.documentElement.setAttribute('data-theme', /^(sunny|ocean|candy|classic)$/.test(t || '') ? t : 'sunny')
-      })()
-    </script>
+    <script src="/theme-prepaint.js"></script>
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   </head>

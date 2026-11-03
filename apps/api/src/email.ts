@@ -45,6 +45,32 @@ ${cta ? `<p><a href="${esc(cta.url)}" style="display:inline-block;background:#ff
 }
 
 export const emails = {
+  verifyEmail(to: string, url: string, lang: Lang = 'en'): Mail {
+    if (lang === 'tr')
+      return {
+        to,
+        subject: 'Kiddie Tube e-posta adresinizi onaylayın',
+        text: `Kiddie Tube hesabınızı tamamlamak için e-posta adresinizi onaylayın (24 saat geçerli): ${url}
+Bu hesabı siz açmadıysanız bu e-postayı yok sayın.`,
+        html: layout(
+          'E-posta adresinizi onaylayın',
+          'Kiddie Tube hesabınızı tamamlamak için e-posta adresinizi onaylayın. Bağlantı 24 saat geçerlidir. Bu hesabı siz açmadıysanız bu e-postayı yok sayın.',
+          { label: 'E-postamı onayla', url },
+          lang,
+        ),
+      }
+    return {
+      to,
+      subject: 'Confirm your Kiddie Tube email',
+      text: `Confirm your email address to finish setting up your Kiddie Tube account (valid for 24 hours): ${url}
+If you didn't create this account, ignore this email.`,
+      html: layout(
+        'Confirm your email',
+        'Confirm your email address to finish setting up your Kiddie Tube account. The link is valid for 24 hours. If you didn’t create this account, ignore this email.',
+        { label: 'Confirm my email', url },
+      ),
+    }
+  },
   passwordReset(to: string, url: string, lang: Lang = 'en'): Mail {
     if (lang === 'tr')
       return {
@@ -109,7 +135,7 @@ Create it here (valid for 7 days): ${url}`,
         text: `${inviter} sizi Kiddie Tube’da "${family}" ailesini birlikte yönetmeye davet etti.
 Buradan kabul edin (7 gün geçerli): ${url}`,
         html: layout(
-          `${esc(family)} ailesine katılın`,
+          `${family} ailesine katılın`,
           `${esc(inviter)} sizi Kiddie Tube’da <b>${esc(family)}</b> ailesini birlikte yönetmeye davet etti. Bağlantı 7 gün geçerlidir.`,
           { label: 'Daveti kabul et', url },
           lang,
@@ -120,7 +146,7 @@ Buradan kabul edin (7 gün geçerli): ${url}`,
       subject: `${inviter} invited you to ${family} on Kiddie Tube`,
       text: `${inviter} invited you to help manage "${family}" on Kiddie Tube.
 Accept here (valid for 7 days): ${url}`,
-      html: layout(`Join ${esc(family)}`, `${esc(inviter)} invited you to help manage <b>${esc(family)}</b> on Kiddie Tube. The link is valid for 7 days.`, {
+      html: layout(`Join ${family}`, `${esc(inviter)} invited you to help manage <b>${esc(family)}</b> on Kiddie Tube. The link is valid for 7 days.`, {
         label: 'Accept invitation',
         url,
       }),

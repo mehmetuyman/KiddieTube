@@ -114,6 +114,12 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
     }
   })
 
+  // Development/tests without a mail provider: read the captured emails (the
+  // end-to-end tests follow the confirmation links). Never in production.
+  if (config.NODE_ENV !== 'production' && !config.RESEND_API_KEY) {
+    app.get('/api/v1/dev/outbox', async () => mailer.outbox.map(({ to, subject, text }) => ({ to, subject, text })))
+  }
+
   await familyRoutes(app, ctx)
   await contentRoutes(app, ctx)
   await feedRoutes(app, ctx)

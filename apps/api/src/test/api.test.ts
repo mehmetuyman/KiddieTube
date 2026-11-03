@@ -424,3 +424,109 @@ describe('language', () => {
     expect(reset.subject).toBe('Kiddie Tube şifrenizi sıfırlayın')
   })
 })
+
+describe('review fixes', () => {
+  const ids = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => (prefix + String(i).padStart(2, '0')).padEnd(11, 'x'))
+
+  it('[H1] an unconfirmed email cannot sign in, and an admin address only counts once confirmed', async () => {
+    const admin = new Client(h)
+    await admin.signIn(ADMIN_EMAIL)
+    await admin.req('POST', '/api/v1/admin/family-invites', { email: 'slow@example.com' })
+    const slow = new Client(h)
+    const su = await slow.req('POST', '/api/auth/sign-up/email', { email: 'slow@example.com', password: 'correct-horse-battery', name: 'Slow' })
+    expect(su.status).toBe(200)
+    expect((await slow.req('GET', '/api/v1/me')).status).toBe(401) // no session before confirming
+    const si = await slow.signIn('slow@example.com')
+    expect(si.status).toBe(403)
+    expect(si.body.code).toBe('EMAIL_NOT_VERIFIED')
+    const link = h.outbox.findLast((m) => m.to === 'slow@example.com' && /verify-email/.test(m.text))!
+    await slow.verify(link.text)
+    expect((await slow.req('GET', '/api/v1/me')).body.user).toMatchObject({ email: 'slow@example.com', isAdmin: false })
+  })
+
+  it('[K1] a paired device can ask whether a PIN is set', async () => {
+    const c = new Client(h)
+    await c.signIn(ADMIN_EMAIL)
+    const fam = (await c.req('POST', '/api/v1/families', { name: 'Probe Family' })).body.id
+    const kid = await c.req('POST', `/api/v1/families/${fam}/profiles`, { name: 'P' })
+    const key = (await c.req('POST', `/api/v1/families/${fam}/devices`, { kidProfileId: kid.body.id, name: 'D' })).body.deviceKey
+    const probe = () => new Client(h).req('GET', '/api/v1/device/pin', undefined, { authorization: `Device ${key}` })
+    expect((await probe()).body).toEqual({ set: false })
+    await c.req('PUT', `/api/v1/families/${fam}/pin`, { pin: '4321' })
+    expect((await probe()).body).toEqual({ set: true })
+    expect((await new Client(h).req('GET', '/api/v1/device/pin')).status).toBe(401)
+  })
+
+  it('[H3] parallel wrong PINs still trigger the lockout', async () => {
+    const c = new Client(h)
+    await c.signIn(ADMIN_EMAIL)
+    const fam = (await c.req('POST', '/api/v1/families', { name: 'Race Family' })).body.id
+    await c.req('PUT', `/api/v1/families/${fam}/pin`, { pin: '9753' })
+    const guesses = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => c.req('POST', `/api/v1/families/${fam}/pin/verify`, { pin: String(1000 + i) })),
+    )
+    expect(guesses.filter((g) => g.status === 429).length).toBeGreaterThan(0)
+    expect((await c.req('POST', `/api/v1/families/${fam}/pin/verify`, { pin: '9753' })).status).toBe(429)
+  })
+
+  it('[M2] accepting an invitation twice (or in parallel) makes one membership', async () => {
+    const owner = new Client(h)
+    await owner.signIn(ADMIN_EMAIL)
+    const fam = (await owner.req('POST', '/api/v1/families', { name: 'Twice Family' })).body.id
+    const inv = await owner.req('POST', `/api/v1/families/${fam}/invitations`, { email: 'twice@example.com' })
+    const p = new Client(h)
+    await p.signUp('twice@example.com')
+    const [a, b] = await Promise.all([
+      p.req('POST', `/api/v1/invitations/${inv.body.id}/accept`),
+      p.req('POST', `/api/v1/invitations/${inv.body.id}/accept`),
+    ])
+    expect([a.status, b.status].sort()).toEqual([200, 404])
+    expect((await p.req('POST', `/api/v1/invitations/${inv.body.id}/accept`)).status).toBe(404)
+    const members = (await owner.req('GET', `/api/v1/families/${fam}/members`)).body.members
+    expect(members.filter((m: { email: string }) => m.email === 'twice@example.com')).toHaveLength(1)
+  })
+
+  it('[L1, L2, M1] empty updates are 400; duplicates are 409, even in parallel; import dedupes and is capped', async () => {
+    const c = new Client(h)
+    await c.signIn(ADMIN_EMAIL)
+    const fam = (await c.req('POST', '/api/v1/families', { name: 'Edge Family' })).body.id
+    const cat = await c.req('POST', `/api/v1/families/${fam}/categories`, { name: 'C', emoji: '🎵' })
+    expect((await c.req('PATCH', `/api/v1/families/${fam}/categories/${cat.body.id}`, {})).status).toBe(400)
+
+    const [x, y] = await Promise.all([
+      c.req('POST', `/api/v1/families/${fam}/videos`, { url: 'dupdupdup01' }),
+      c.req('POST', `/api/v1/families/${fam}/videos`, { url: 'dupdupdup01' }),
+    ])
+    expect([x.status, y.status].sort()).toEqual([201, 409])
+
+    const imp = await c.req('POST', `/api/v1/families/${fam}/videos/import`, {
+      urls: ['impimpimp01', 'impimpimp01', 'https://youtu.be/impimpimp02', 'dupdupdup01', 'nope'],
+    })
+    expect(imp.body.results.map((r: { ok: boolean }) => r.ok)).toEqual([true, true, false, false])
+    expect(imp.body.results[2].error).toBe('That video is already in the list')
+    expect((await c.req('POST', `/api/v1/families/${fam}/videos/import`, { urls: ids('cap', 51) })).status).toBe(400)
+  })
+
+  it('[M4] the nightly check changes nothing when YouTube refuses most lookups', async () => {
+    const { checkAllVideos } = await import('../scripts/check-videos.ts')
+    const c = new Client(h)
+    await c.signIn(ADMIN_EMAIL)
+    const fam = (await c.req('POST', '/api/v1/families', { name: 'Throttle Family' })).body.id
+    await c.req('POST', `/api/v1/families/${fam}/videos/import`, { urls: ids('thr', 12) })
+    const throttled = async () => new Response('', { status: 403 })
+    const r = await checkAllVideos(h.db.db, { fetchImpl: throttled as never })
+    expect(r.aborted).toMatch(/throttling/)
+    const list = (await c.req('GET', `/api/v1/families/${fam}/videos`)).body
+    expect(list.every((v: { status: string }) => v.status === 'ok')).toBe(true)
+  })
+
+  it('[L3] family names are escaped once in invitation emails', async () => {
+    const owner = new Client(h)
+    await owner.signIn(ADMIN_EMAIL)
+    const fam = (await owner.req('POST', '/api/v1/families', { name: 'Ali & Ayşe' })).body.id
+    await owner.req('POST', `/api/v1/families/${fam}/invitations`, { email: 'amp@example.com' })
+    const mail = h.outbox.findLast((m) => m.to === 'amp@example.com')!
+    expect(mail.html).toContain('Join Ali &#38; Ayşe')
+    expect(mail.html).not.toContain('&#38;#38;')
+  })
+})

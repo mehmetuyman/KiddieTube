@@ -29,3 +29,12 @@ export function usePath(): string {
 }
 
 export const query = (name: string) => new URLSearchParams(window.location.search).get(name)
+
+/** Path + query of the current page, relative to the base (to come back to it later). */
+export const here = () => currentPath() + window.location.search
+
+/** A same-app path from ?next=, or the fallback (never another site). */
+export function nextPath(fallback: string): string {
+  const n = query('next')
+  return n && n.startsWith('/') && !n.startsWith('//') ? n : fallback
+}

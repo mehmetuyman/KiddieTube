@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Family } from '@kiddietube/shared'
 import { ApiRequestError, api, authApi } from '../server/api'
-import { navigate, query, usePath } from '../router'
+import { here, navigate, nextPath, query, usePath } from '../router'
 import { CategoriesPage, DevicesPage, ProfilesPage, VideosPage } from './FamilyPages'
 import { AdminPage, MembersPage, SettingsPage } from './SettingsPages'
 import './console.css'
@@ -251,7 +251,8 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
     try {
       await authApi.signIn(email, password)
       await onDone()
-      if (!window.location.pathname.includes('/parent')) navigate('/parent/videos', { replace: true })
+      // back to the invitation (etc.) that sent them here [review M3]
+      navigate(nextPath('/parent/videos'), { replace: true })
     } catch (err) {
       setError(err instanceof ApiRequestError && err.status === 401 ? c.wrongLogin : errorText(err))
     } finally {
@@ -302,25 +303,37 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
   )
 }
 
-function SignUpForm({ email: presetEmail, onDone, title }: { email?: string; onDone: () => Promise<void>; title: string }) {
+/**
+ * Create an account. The email address is confirmed first: the link in the
+ * confirmation email signs them in and brings them back to this page.
+ */
+function SignUpForm({ email: presetEmail, title }: { email?: string; title: string }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState(presetEmail ?? '')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(query('error') ? c.confirmLinkInvalid : null)
+  const [sentTo, setSentTo] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
-      await authApi.signUp(email, password, name)
-      await onDone()
+      await authApi.signUp(email, password, name, here().replace(/[?&]error=[^&]*/, ''))
+      setSentTo(email)
     } catch (err) {
       setError(errorText(err))
     } finally {
       setBusy(false)
     }
   }
+  if (sentTo)
+    return (
+      <div className="pp-form">
+        <h3 className="pp-form-title">{c.checkEmailTitle}</h3>
+        <div className="pp-notice">{c.checkEmailText(sentTo)}</div>
+      </div>
+    )
   return (
     <form onSubmit={submit} className="pp-form">
       <h3 className="pp-form-title">{title}</h3>
@@ -350,7 +363,7 @@ function SignUpForm({ email: presetEmail, onDone, title }: { email?: string; onD
       </button>
       <p className="pc-muted">
         {c.haveAccount[0]}
-        <a href="#" onClick={(e) => (e.preventDefault(), navigate('/parent'))}>
+        <a href="#" onClick={(e) => (e.preventDefault(), navigate(`/parent?next=${encodeURIComponent(here())}`))}>
           {c.haveAccount[1]}
         </a>
         {c.haveAccount[2]}
@@ -362,15 +375,17 @@ function SignUpForm({ email: presetEmail, onDone, title }: { email?: string; onD
 /** /join?invite=…  — create an account (if needed) and a new family. */
 function Join({ me, onDone }: { me: Me | null | undefined; onDone: () => Promise<void> }) {
   const token = query('invite') ?? ''
+  // No invite token and signed in: nothing to join, go to the console
+  // (in an effect, not during render [review L9]).
+  const done = !token && !!me
+  useEffect(() => {
+    if (done) navigate('/parent', { replace: true })
+  }, [done])
   if (me === undefined) return <p className="pc-muted">{c.loading}</p>
   // No invite token: first-time sign-up of the instance admin (the server only
   // accepts admin emails or invited ones), then on to create a family.
-  if (!token) {
-    if (!me) return <SignUpForm title={c.createYourAccount} onDone={async () => (await onDone(), navigate('/parent', { replace: true }))} />
-    navigate('/parent', { replace: true })
-    return null
-  }
-  if (!me) return <SignUpForm title={c.welcomeCreate} onDone={onDone} />
+  if (!token) return me ? null : <SignUpForm title={c.createYourAccount} />
+  if (!me) return <SignUpForm title={c.welcomeCreate} />
   return <CreateFamily inviteToken={token} onCreated={async () => (await onDone(), navigate('/parent/profiles', { replace: true }))} />
 }
 
@@ -381,7 +396,7 @@ function AcceptInvite({ me, onDone }: { me: Me | null | undefined; onDone: () =>
   const [busy, setBusy] = useState(false)
   if (!id) return <div className="pp-error">{c.inviteIncomplete}</div>
   if (me === undefined) return <p className="pc-muted">{c.loading}</p>
-  if (!me) return <SignUpForm title={c.invitedCreate} onDone={onDone} />
+  if (!me) return <SignUpForm title={c.invitedCreate} />
   const accept = async () => {
     setBusy(true)
     try {
