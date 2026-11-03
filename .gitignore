@@ -47,3 +47,6 @@ blob-report/
 
 # API local data (PGlite)
 apps/api/.data/
+dist-server/
+playwright-report-server/
+test-results-server/

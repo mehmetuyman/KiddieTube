@@ -341,8 +341,14 @@ function SignUpForm({ email: presetEmail, onDone, title }: { email?: string; onD
 /** /join?invite=…  — create an account (if needed) and a new family. */
 function Join({ me, onDone }: { me: Me | null | undefined; onDone: () => Promise<void> }) {
   const token = query('invite') ?? ''
-  if (!token) return <div className="pp-error">This invitation link is incomplete.</div>
   if (me === undefined) return <p className="pc-muted">Loading…</p>
+  // No invite token: first-time sign-up of the instance admin (the server only
+  // accepts admin emails or invited ones), then on to create a family.
+  if (!token) {
+    if (!me) return <SignUpForm title="Create your account" onDone={async () => (await onDone(), navigate('/parent', { replace: true }))} />
+    navigate('/parent', { replace: true })
+    return null
+  }
   if (!me) return <SignUpForm title="Welcome! Create your parent account" onDone={onDone} />
   return <CreateFamily inviteToken={token} onCreated={async () => (await onDone(), navigate('/parent/profiles', { replace: true }))} />
 }

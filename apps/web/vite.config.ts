@@ -19,7 +19,7 @@ export default defineConfig({
   base,
   server: {
     // server mode in development: `npm run dev -w @kiddietube/api` on :3007
-    proxy: { '/api': 'http://127.0.0.1:3007' },
+    proxy: { '/api': process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3007' },
   },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),

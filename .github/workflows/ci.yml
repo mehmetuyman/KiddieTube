@@ -49,6 +49,10 @@ jobs:
       - run: npm run test:e2e
         env:
           CI: 'true'
+      - name: End-to-end, server mode (real API + server-mode build)
+        run: npm run test:e2e:server
+        env:
+          CI: 'true'
 
       - name: Upload Playwright report
         if: failure()
@@ -58,4 +62,6 @@ jobs:
           path: |
             apps/web/playwright-report
             apps/web/test-results
+            apps/web/playwright-report-server
+            apps/web/test-results-server
           retention-days: 7

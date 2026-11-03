@@ -7,7 +7,11 @@ const config = loadConfig()
 // Production applies migrations explicitly (deploy.sh); dev/PGlite migrates on start.
 const isPostgres = config.DATABASE_URL?.startsWith('postgres')
 const handle = await openDb(config.DATABASE_URL ?? 'pglite:./.data/dev', { migrate: !isPostgres })
-const { app } = await buildApp({ config, db: handle.db })
+const { app } = await buildApp({
+  config,
+  db: handle.db,
+  ...(config.FAKE_YOUTUBE_META ? { fetchMeta: async (id: string) => ({ title: `Video ${id}`, channel: 'Test Channel' }) } : {}),
+})
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down')
