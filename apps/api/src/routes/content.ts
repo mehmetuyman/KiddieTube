@@ -2,6 +2,7 @@
 // Every handler checks membership, then runs inside withFamily() so
 // row-level security confines it to that family's rows.
 import { asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { langOf, translate } from '../lib/i18n.ts'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import {
@@ -213,7 +214,7 @@ export async function contentRoutes(app: FastifyInstance, ctx: AppContext) {
         })
         results.push({ url, ok: true, video: toVideo(r) })
       } catch (e) {
-        results.push({ url, ok: false, error: (e as Error).message })
+        results.push({ url, ok: false, error: translate((e as Error).message, langOf(req.headers)) })
       }
     }
     return { results }

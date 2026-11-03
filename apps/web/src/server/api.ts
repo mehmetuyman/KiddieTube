@@ -2,6 +2,7 @@
 // Same-origin requests; the parent session is an HttpOnly cookie.
 import { API_PREFIX } from '@kiddietube/shared/constants'
 import type { ApiError } from '@kiddietube/shared'
+import { getLang } from '../lib/i18n'
 
 export class ApiRequestError extends Error {
   constructor(
@@ -31,12 +32,13 @@ export async function request<T>(
     res = await fetch(`${base}${path}`, {
       method,
       credentials: 'same-origin',
-      headers: { ...(body !== undefined ? { 'content-type': 'application/json' } : {}), ...opts.headers },
+      // the server answers errors and sends emails in this device's language
+      headers: { 'x-kt-lang': getLang(), ...(body !== undefined ? { 'content-type': 'application/json' } : {}), ...opts.headers },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(opts.timeoutMs ?? 8000),
     })
   } catch {
-    throw new ApiRequestError(0, 'offline', 'Can’t reach the server right now.')
+    throw new ApiRequestError(0, 'offline', getLang() === 'tr' ? 'Sunucuya şu anda ulaşılamıyor.' : 'Can’t reach the server right now.')
   }
   if (opts.raw) return res as unknown as T
   if (res.status === 204) return undefined as T

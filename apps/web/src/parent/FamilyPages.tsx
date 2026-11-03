@@ -7,6 +7,8 @@ import { getPairing, savePairing, syncFeed } from '../server/device'
 import { THEMES } from '../lib/theme'
 import { thumbUrl } from '../lib/videoStore'
 import { errorText, type Me } from './ParentConsole'
+import { c, fmtDateTime } from './strings'
+import { themeName } from '../lib/i18n'
 
 export interface PageProps {
   familyId: string
@@ -122,68 +124,68 @@ export function VideosPage({ familyId }: PageProps) {
     <section>
       <Messages error={videos.error ?? act.error} notice={act.notice} />
       <div className="pp-toolbar">
-        <input className="pp-input" placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <input className="pp-input" placeholder={c.filter} value={filter} onChange={(e) => setFilter(e.target.value)} />
         <button className="pp-btn pp-btn-primary" onClick={() => setAdding('one')}>
-          + Add video
+          {c.addVideo}
         </button>
         <button className="pp-btn pp-btn-ghost" onClick={() => setAdding('many')}>
-          Import links
+          {c.importLinks}
         </button>
       </div>
-      <div className="pp-seg" role="group" aria-label="Show">
+      <div className="pp-seg" role="group" aria-label={c.show}>
         {(['all', 'visible', 'hidden'] as const).map((k) => (
           <button key={k} className={`pp-seg-btn ${show === k ? 'active' : ''}`} aria-pressed={show === k} onClick={() => setShow(k)}>
             {k === 'all'
-              ? `All (${videos.data?.length ?? 0})`
+              ? c.showAll(videos.data?.length ?? 0)
               : k === 'visible'
-                ? `Visible (${(videos.data?.length ?? 0) - hiddenCount})`
-                : `Hidden (${hiddenCount})`}
+                ? c.showVisible((videos.data?.length ?? 0) - hiddenCount)
+                : c.showHidden(hiddenCount)}
           </button>
         ))}
       </div>
       {videos.data && videos.data.length === 0 && (
         <div className="pc-empty">
-          <p>No videos yet. Add the first one with a YouTube link.</p>
-          {(cats.data?.length ?? 0) === 0 && <p className="pc-muted">Tip: create a few categories first (Categories tab) to group them.</p>}
+          <p>{c.noVideos}</p>
+          {(cats.data?.length ?? 0) === 0 && <p className="pc-muted">{c.tipCategories}</p>}
         </div>
       )}
       <ul className="pp-list">
         {list.map((v) => {
-          const c = catName(v.categoryId)
+          const cat = catName(v.categoryId)
           return (
             <li key={v.id} className={`pp-row ${v.hidden ? 'is-hidden' : ''}`}>
               <img className="pp-thumb" src={thumbUrl(v.youtubeId)} alt="" loading="lazy" />
               <div className="pp-row-main">
                 <div className="pp-row-title">{v.title}</div>
                 <div className="pp-row-cat">
-                  {v.hidden && <span className="pp-tag">Hidden</span>}
-                  {v.status === 'unavailable' && <span className="pp-tag">Unavailable</span>}
-                  {c ? `${c.emoji} ${c.name}` : 'No category'}
+                  {v.hidden && <span className="pp-tag">{c.tagHidden}</span>}
+                  {v.status === 'unavailable' && <span className="pp-tag">{c.tagUnavailable}</span>}
+                  {cat ? `${cat.emoji} ${cat.name}` : c.noCategory}
                 </div>
               </div>
               <div className="pp-row-actions">
                 <button className="pp-btn pp-btn-ghost" onClick={() => setEditing(v)} disabled={act.busy}>
-                  Edit
+                  {c.edit}
                 </button>
                 <button
                   className="pp-btn pp-btn-ghost"
-                  onClick={() => patch(v, { hidden: !v.hidden }, v.hidden ? 'Shown again' : 'Hidden from the kids')}
+                  onClick={() => patch(v, { hidden: !v.hidden }, v.hidden ? c.shownAgain : c.hiddenFromKids)}
                   disabled={act.busy}
                 >
-                  {v.hidden ? 'Unhide' : 'Hide'}
+                  {v.hidden ? c.unhide : c.hide}
                 </button>
                 <button
                   className="pp-btn pp-btn-danger"
                   disabled={act.busy}
                   onClick={() =>
-                    window.confirm(`Delete “${v.title}”?`) &&
+                    window.confirm(c.confirmDelete(v.title)) &&
                     act.run(async () => {
                       await api.del(`/families/${familyId}/videos/${v.id}`)
                       await videos.reload()
-                    }, 'Deleted')
+                    }, c.deleted)
                   }
                 >
-                  Delete
+                  {c.delete}
                 </button>
               </div>
             </li>
@@ -197,10 +199,10 @@ export function VideosPage({ familyId }: PageProps) {
 function CategorySelect({ categories, value, onChange }: { categories: Category[]; value: string | null; onChange: (v: string | null) => void }) {
   return (
     <select className="pp-input" value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-      <option value="">No category</option>
-      {categories.map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.emoji} {c.name}
+      <option value="">{c.noCategory}</option>
+      {categories.map((x) => (
+        <option key={x.id} value={x.id}>
+          {x.emoji} {x.name}
         </option>
       ))}
     </select>
@@ -256,7 +258,7 @@ function AddVideos({
   if (results)
     return (
       <section className="pp-form">
-        <h3 className="pp-form-title">Import results</h3>
+        <h3 className="pp-form-title">{c.importResults}</h3>
         <ul className="pc-results">
           {results.map((r) => (
             <li key={r.url} className={r.ok ? 'ok' : 'fail'}>
@@ -265,17 +267,17 @@ function AddVideos({
           ))}
         </ul>
         <button className="pp-btn pp-btn-primary" onClick={() => onClose(true)}>
-          Done
+          {c.done}
         </button>
       </section>
     )
 
   return (
     <form className="pp-form" onSubmit={submit}>
-      <h3 className="pp-form-title">{many ? 'Import several links' : 'Add a video'}</h3>
+      <h3 className="pp-form-title">{many ? c.importSeveral : c.addAVideo}</h3>
       <Messages error={act.error} />
       <label className="pp-field">
-        <span>{many ? 'YouTube links (one per line)' : 'YouTube link or video ID'}</span>
+        <span>{many ? c.linksLabel : c.linkLabel}</span>
         {many ? (
           <textarea className="pp-input" rows={6} value={url} onChange={(e) => setUrl(e.target.value)} required />
         ) : (
@@ -284,7 +286,9 @@ function AddVideos({
       </label>
       {!many && (
         <label className="pp-field">
-          <span>Title {needTitle ? '' : '(optional: filled in from YouTube)'}</span>
+          <span>
+            {c.title} {needTitle ? '' : c.titleOptional}
+          </span>
           <input className="pp-input" value={title} onChange={(e) => setTitle(e.target.value)} />
         </label>
       )}
@@ -294,10 +298,10 @@ function AddVideos({
       </label>
       <div className="pp-form-actions">
         <button type="button" className="pp-btn pp-btn-ghost" onClick={() => onClose(false)}>
-          Cancel
+          {c.cancel}
         </button>
         <button className="pp-btn pp-btn-primary" disabled={act.busy}>
-          {act.busy ? 'Adding…' : many ? 'Import' : 'Add'}
+          {act.busy ? c.adding : many ? c.import : c.add}
         </button>
       </div>
     </form>
@@ -324,11 +328,11 @@ function EditVideo({
   }
   return (
     <form className="pp-form" onSubmit={submit}>
-      <h3 className="pp-form-title">Edit video</h3>
+      <h3 className="pp-form-title">{c.editVideo}</h3>
       <img className="pp-preview" src={thumbUrl(video.youtubeId)} alt="" />
       <Messages error={act.error} />
       <label className="pp-field">
-        <span>Title</span>
+        <span>{c.title}</span>
         <input className="pp-input" value={title} onChange={(e) => setTitle(e.target.value)} required />
       </label>
       <label className="pp-field">
@@ -337,10 +341,10 @@ function EditVideo({
       </label>
       <div className="pp-form-actions">
         <button type="button" className="pp-btn pp-btn-ghost" onClick={() => onClose(false)}>
-          Cancel
+          {c.cancel}
         </button>
         <button className="pp-btn pp-btn-primary" disabled={act.busy}>
-          Save
+          {c.save}
         </button>
       </div>
     </form>
@@ -363,7 +367,7 @@ export function CategoriesPage({ familyId }: PageProps) {
       await act.run(async () => {
         await api.post(`/families/${familyId}/categories`, { name, emoji })
         await cats.reload()
-      }, 'Category added')
+      }, c.categoryAdded)
     )
       setName('')
   }
@@ -382,35 +386,35 @@ export function CategoriesPage({ familyId }: PageProps) {
     <section>
       <Messages error={cats.error ?? act.error} notice={act.notice} />
       <form className="pc-inline-form" onSubmit={add}>
-        <select className="pp-input pc-emoji-select" value={emoji} onChange={(e) => setEmoji(e.target.value)} aria-label="Emoji">
+        <select className="pp-input pc-emoji-select" value={emoji} onChange={(e) => setEmoji(e.target.value)} aria-label={c.emoji}>
           {EMOJI_CHOICES.map((e) => (
             <option key={e}>{e}</option>
           ))}
         </select>
-        <input className="pp-input" placeholder="New category name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <input className="pp-input" placeholder={c.newCategoryName} value={name} onChange={(e) => setName(e.target.value)} required />
         <button className="pp-btn pp-btn-primary" disabled={act.busy}>
-          Add
+          {c.add}
         </button>
       </form>
-      {cats.data?.length === 0 && <p className="pc-muted">No categories yet. Kids see a single list until you add some.</p>}
+      {cats.data?.length === 0 && <p className="pc-muted">{c.noCategories}</p>}
       <ul className="pp-list">
-        {(cats.data ?? []).map((c, i) => (
-          <li key={c.id} className="pp-row">
+        {(cats.data ?? []).map((cat, i) => (
+          <li key={cat.id} className="pp-row">
             <span className="pc-cat-emoji" aria-hidden="true">
-              {c.emoji}
+              {cat.emoji}
             </span>
             <div className="pp-row-main">
-              <div className="pp-row-title">{c.name}</div>
+              <div className="pp-row-title">{cat.name}</div>
             </div>
             <div className="pc-row-actions-inline">
-              <button className="pp-btn pp-btn-ghost" onClick={() => move(i, -1)} disabled={act.busy || i === 0} aria-label="Move up">
+              <button className="pp-btn pp-btn-ghost" onClick={() => move(i, -1)} disabled={act.busy || i === 0} aria-label={c.moveUp}>
                 ↑
               </button>
               <button
                 className="pp-btn pp-btn-ghost"
                 onClick={() => move(i, 1)}
                 disabled={act.busy || i === (cats.data?.length ?? 0) - 1}
-                aria-label="Move down"
+                aria-label={c.moveDown}
               >
                 ↓
               </button>
@@ -418,28 +422,28 @@ export function CategoriesPage({ familyId }: PageProps) {
                 className="pp-btn pp-btn-ghost"
                 disabled={act.busy}
                 onClick={() => {
-                  const n = window.prompt('Rename category', c.name)
+                  const n = window.prompt(c.renameCategory, cat.name)
                   if (n && n.trim())
                     void act.run(async () => {
-                      await api.patch(`/families/${familyId}/categories/${c.id}`, { name: n.trim() })
+                      await api.patch(`/families/${familyId}/categories/${cat.id}`, { name: n.trim() })
                       await cats.reload()
                     })
                 }}
               >
-                Rename
+                {c.rename}
               </button>
               <button
                 className="pp-btn pp-btn-danger"
                 disabled={act.busy}
                 onClick={() =>
-                  window.confirm(`Delete “${c.name}”? Its videos stay, without a category.`) &&
+                  window.confirm(c.confirmDeleteCategory(cat.name)) &&
                   act.run(async () => {
-                    await api.del(`/families/${familyId}/categories/${c.id}`)
+                    await api.del(`/families/${familyId}/categories/${cat.id}`)
                     await cats.reload()
-                  }, 'Deleted')
+                  }, c.deleted)
                 }
               >
-                Delete
+                {c.delete}
               </button>
             </div>
           </li>
@@ -462,12 +466,12 @@ export function ProfilesPage({ familyId }: PageProps) {
 
   const pairThisDevice = (p: KidProfile) =>
     act.run(async () => {
-      const name = window.prompt('Name this device (e.g. “Ali’s tablet”)', `${p.name}’s device`)
+      const name = window.prompt(c.nameDevicePrompt, c.defaultDeviceName(p.name))
       if (!name) return
       const r = await api.post<PairResult>(`/families/${familyId}/devices`, { kidProfileId: p.id, name })
       savePairing({ deviceId: r.device.id, familyId, kidProfileId: p.id, key: r.deviceKey, name })
       await syncFeed()
-    }, `This device now shows ${p.name}’s videos. It keeps working even when the server is offline.`)
+    }, c.pairedNotice(p.name))
 
   if (editing)
     return (
@@ -486,11 +490,10 @@ export function ProfilesPage({ familyId }: PageProps) {
     <section>
       <Messages error={profiles.error ?? act.error} notice={act.notice} />
       <p className="pc-muted">
-        Each kid profile has its own list (all categories, or just the ones you pick). Pair the phone or tablet you’re holding with a profile using
-        “Use this device”.
+        {c.profilesIntro}
       </p>
       <button className="pp-btn pp-btn-primary" onClick={() => setEditing('new')}>
-        + Add kid
+        {c.addKid}
       </button>
       <ul className="pp-list">
         {(profiles.data ?? []).map((p) => {
@@ -502,23 +505,23 @@ export function ProfilesPage({ familyId }: PageProps) {
               </span>
               <div className="pp-row-main">
                 <div className="pp-row-title">
-                  {p.name} {here && <span className="pp-tag">This device</span>}
+                  {p.name} {here && <span className="pp-tag">{c.thisDevice}</span>}
                 </div>
                 <div className="pp-row-cat">
                   {p.categoryIds.length === 0
-                    ? 'All categories'
+                    ? c.allCategories
                     : (cats.data ?? [])
-                        .filter((c) => p.categoryIds.includes(c.id))
-                        .map((c) => `${c.emoji} ${c.name}`)
+                        .filter((x) => p.categoryIds.includes(x.id))
+                        .map((x) => `${x.emoji} ${x.name}`)
                         .join(', ')}
                 </div>
               </div>
               <div className="pp-row-actions">
                 <button className="pp-btn pp-btn-primary" onClick={() => pairThisDevice(p)} disabled={act.busy || here}>
-                  Use this device
+                  {c.useThisDevice}
                 </button>
                 <button className="pp-btn pp-btn-ghost" onClick={() => setEditing(p)}>
-                  Edit
+                  {c.edit}
                 </button>
               </div>
             </li>
@@ -555,14 +558,14 @@ function EditProfile({
   }
   return (
     <form className="pp-form" onSubmit={submit}>
-      <h3 className="pp-form-title">{profile ? `Edit ${profile.name}` : 'Add a kid'}</h3>
+      <h3 className="pp-form-title">{profile ? c.editProfile(profile.name) : c.addAKid}</h3>
       <Messages error={act.error} />
       <label className="pp-field">
-        <span>Name</span>
+        <span>{c.name}</span>
         <input className="pp-input" value={name} onChange={(e) => setName(e.target.value)} required />
       </label>
       <div className="pp-field">
-        <span>Avatar</span>
+        <span>{c.avatar}</span>
         <div className="pc-chip-row">
           {AVATARS.map((a) => (
             <button type="button" key={a} className={`pc-chip ${avatar === a ? 'active' : ''}`} onClick={() => setAvatar(a)}>
@@ -572,30 +575,30 @@ function EditProfile({
         </div>
       </div>
       <label className="pp-field">
-        <span>Theme on new devices</span>
+        <span>{c.themeOnNew}</span>
         <select className="pp-input" value={defaultTheme ?? ''} onChange={(e) => setDefaultTheme((e.target.value || null) as typeof defaultTheme)}>
-          <option value="">Default (Sunny)</option>
+          <option value="">{c.defaultTheme}</option>
           {THEMES.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.emoji} {t.name} / {t.en}
+              {t.emoji} {themeName(t)}
             </option>
           ))}
         </select>
       </label>
       <div className="pp-field">
-        <span>Categories this kid sees (none selected = all)</span>
+        <span>{c.kidCategories}</span>
         <div className="pc-chip-row">
-          {categories.map((c) => {
-            const on = catIds.includes(c.id)
+          {categories.map((cat) => {
+            const on = catIds.includes(cat.id)
             return (
               <button
                 type="button"
-                key={c.id}
+                key={cat.id}
                 className={`pc-chip ${on ? 'active' : ''}`}
                 aria-pressed={on}
-                onClick={() => setCatIds(on ? catIds.filter((x) => x !== c.id) : [...catIds, c.id])}
+                onClick={() => setCatIds(on ? catIds.filter((x) => x !== cat.id) : [...catIds, cat.id])}
               >
-                {c.emoji} {c.name}
+                {cat.emoji} {cat.name}
               </button>
             )
           })}
@@ -607,22 +610,22 @@ function EditProfile({
             type="button"
             className="pp-btn pp-btn-danger"
             onClick={() =>
-              window.confirm(`Remove ${profile.name}? Devices paired to this profile stop working.`) &&
+              window.confirm(c.confirmRemoveKid(profile.name)) &&
               act.run(async () => {
                 await api.del(`/families/${familyId}/profiles/${profile.id}`)
                 onClose(true)
               })
             }
           >
-            Remove
+            {c.remove}
           </button>
         )}
         <span className="pc-spacer" />
         <button type="button" className="pp-btn pp-btn-ghost" onClick={() => onClose(false)}>
-          Cancel
+          {c.cancel}
         </button>
         <button className="pp-btn pp-btn-primary" disabled={act.busy}>
-          Save
+          {c.save}
         </button>
       </div>
     </form>
@@ -636,14 +639,13 @@ export function DevicesPage({ familyId }: PageProps) {
   const profiles = useResource(() => api.get<KidProfile[]>(`/families/${familyId}/profiles`), [familyId])
   const act = useAction()
   const pairing = getPairing()
-  const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'never')
+  const fmt = (iso: string | null) => (iso ? fmtDateTime(iso) : c.never)
 
   return (
     <section>
       <Messages error={devices.error ?? act.error} notice={act.notice} />
       <p className="pc-muted">
-        To add a device, open Kiddie Tube on it, sign in here and choose “Use this device” on the Kids tab. Lost a device? Revoke it: it stops
-        receiving the list.
+        {c.devicesIntro}
       </p>
       <ul className="pp-list">
         {(devices.data ?? []).map((d) => (
@@ -653,11 +655,11 @@ export function DevicesPage({ familyId }: PageProps) {
             </span>
             <div className="pp-row-main">
               <div className="pp-row-title">
-                {d.name} {pairing?.deviceId === d.id && <span className="pp-tag">This device</span>}
-                {d.revoked && <span className="pp-tag">Revoked</span>}
+                {d.name} {pairing?.deviceId === d.id && <span className="pp-tag">{c.thisDevice}</span>}
+                {d.revoked && <span className="pp-tag">{c.revoked}</span>}
               </div>
               <div className="pp-row-cat">
-                {profiles.data?.find((p) => p.id === d.kidProfileId)?.name ?? '—'} · last seen {fmt(d.lastSeenAt)}
+                {profiles.data?.find((p) => p.id === d.kidProfileId)?.name ?? '—'} · {c.lastSeen(fmt(d.lastSeenAt))}
               </div>
             </div>
             {!d.revoked && (
@@ -665,14 +667,14 @@ export function DevicesPage({ familyId }: PageProps) {
                 className="pp-btn pp-btn-danger"
                 disabled={act.busy}
                 onClick={() =>
-                  window.confirm(`Revoke “${d.name}”?`) &&
+                  window.confirm(c.confirmRevoke(d.name)) &&
                   act.run(async () => {
                     await api.post(`/families/${familyId}/devices/${d.id}/revoke`)
                     await devices.reload()
-                  }, 'Revoked')
+                  }, c.revoked)
                 }
               >
-                Revoke
+                {c.revoke}
               </button>
             )}
           </li>

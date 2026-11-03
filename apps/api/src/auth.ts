@@ -6,6 +6,7 @@
 // admin (ADMIN_EMAILS), has an unused family invite, or has a pending
 // invitation into an existing family.
 import { betterAuth } from 'better-auth'
+import { langOf } from './lib/i18n.ts'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { and, eq, gt, isNull } from 'drizzle-orm'
 import type { Config } from './config.ts'
@@ -70,8 +71,8 @@ export function createAuth(db: Db, config: Config, mailer: Mailer) {
       autoSignIn: true,
       resetPasswordTokenExpiresIn: 60 * 60,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async ({ user, url }) => {
-        await mailer.send(emails.passwordReset(user.email, url))
+      sendResetPassword: async ({ user, url }, request) => {
+        await mailer.send(emails.passwordReset(user.email, url, langOf(request?.headers)))
       },
     },
     session: {

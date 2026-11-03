@@ -28,6 +28,11 @@ The GitHub Pages build keeps working as before.
   - **One-time import** of the existing list (Gist or `videos.json`) into
     one family.
 - **"New version — Update" banner:** updates wait for a tap.
+- **Turkish and English everywhere,** chosen per device (defaults to the
+  device language; switchable in the console header, Settings, and the
+  on-device panel's Theme tab): kids' page, parent console, on-device parent
+  panel, server error messages, and emails (sent in the language of the
+  device that triggered them).
 - **Turkish/English kids' page,** chosen from the device language and
   switchable per device.
 - **Deployment for the home server:** systemd unit, nginx with CSP,

@@ -1,5 +1,6 @@
 // Families, members and invitations, plus instance-admin family invites.
 import { and, desc, eq, gt, isNull } from 'drizzle-orm'
+import { langOf } from '../lib/i18n.ts'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { createFamilyBody, inviteBody, type Family } from '@kiddietube/shared'
@@ -171,7 +172,7 @@ export async function familyRoutes(app: FastifyInstance, ctx: AppContext) {
       inviterId: user.id,
     })
     const [fam] = await ctx.db.select({ name: s.organization.name }).from(s.organization).where(eq(s.organization.id, familyId))
-    await ctx.mailer.send(emails.memberInvite(email, user.name, fam.name, `${ctx.config.BASE_URL}/accept?invitation=${id}`))
+    await ctx.mailer.send(emails.memberInvite(email, user.name, fam.name, `${ctx.config.BASE_URL}/accept?invitation=${id}`, langOf(req.headers)))
     await withFamily(ctx.db, familyId, (tx) => touch(tx, familyId, user.id, 'invite', 'member', id, { email, role: body.role }))
     return reply.status(201).send({ id })
   })
@@ -228,7 +229,7 @@ export async function familyRoutes(app: FastifyInstance, ctx: AppContext) {
         expiresAt: new Date(Date.now() + INVITE_TTL_MS),
       }),
     )
-    await ctx.mailer.send(emails.familyInvite(email, admin.name, `${ctx.config.BASE_URL}/join?invite=${token}`))
+    await ctx.mailer.send(emails.familyInvite(email, admin.name, `${ctx.config.BASE_URL}/join?invite=${token}`, langOf(req.headers)))
     return reply.status(201).send({ id })
   })
 

@@ -93,7 +93,7 @@ test.describe('parent panel', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'sunny')
     const panel = page.getByRole('dialog', { name: 'Parent panel' })
     await panel.getByRole('button', { name: 'Theme' }).click()
-    await panel.locator('.pp-theme-card', { hasText: 'Okyanus' }).click()
+    await panel.locator('.pp-theme-card', { hasText: 'Ocean' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'ocean')
 
     await page.reload()
@@ -173,5 +173,16 @@ test.describe('Turkish device', () => {
     await page.locator('.video-card').nth(1).click()
     await expect(page.locator('#videoStatus')).toHaveText('Oynatılıyor')
     await expect(page.locator('html')).toHaveAttribute('lang', 'tr')
+  })
+
+  test('parent panel speaks Turkish too, and the language can be switched', async ({ page }) => {
+    await openApp(page, '?parent=1')
+    const panel = page.getByRole('dialog', { name: 'Ebeveyn paneli' })
+    await expect(panel.getByRole('button', { name: '+ Video ekle' })).toBeVisible()
+    await panel.getByRole('button', { name: 'Tema' }).click()
+    await expect(panel.locator('.pp-theme-card', { hasText: 'Okyanus' })).toBeVisible()
+    await panel.getByRole('button', { name: '🇬🇧 English' }).click()
+    await expect(page.locator('.grid-title')).toHaveText('All Videos')
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en')
   })
 })

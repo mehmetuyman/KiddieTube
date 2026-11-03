@@ -247,3 +247,25 @@
   color: #6b7280;
   text-decoration: line-through;
 }
+
+/* Brand + language selector row */
+.pc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pc-header .pc-brand {
+  margin-bottom: 0;
+}
+
+.pc-lang {
+  border: 1px solid #e3e8ef;
+  border-radius: 999px;
+  background: #fff;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  color: #35506b;
+}

@@ -19,6 +19,8 @@ import {
   LoadSource,
 } from '../lib/videoStore'
 import { THEMES, DEFAULT_THEME, ThemeId, getTheme, setTheme } from '../lib/theme'
+import { getLang, setLang, t, themeName } from '../lib/i18n'
+import { p } from './parentPanelStrings'
 
 type Props = {
   open: boolean
@@ -121,7 +123,7 @@ export default function ParentPanel({
     try {
       const next = await commitOp(videos, op)
       onVideosChange(next)
-      setNotice(isGistConfigured() ? `${successMsg} — synced to all devices` : `${successMsg} on this device`)
+      setNotice(isGistConfigured() ? p.synced(successMsg) : p.onDevice(successMsg))
       return true
     } catch (err: any) {
       setError(err?.message || String(err))
@@ -187,27 +189,25 @@ export default function ParentPanel({
     if (!form) return
     const id = form.videoId || parseYouTubeId(form.url)
     if (!id) {
-      setError('Enter a valid YouTube link or 11-character video ID.')
+      setError(p.badLink)
       return
     }
     const title = form.title.trim()
     if (!title) {
-      setError('Title is required.')
+      setError(p.titleRequired)
       return
     }
     const category =
       form.category === NEW_CATEGORY ? form.newCategory.trim() : form.category.trim()
     if (!category) {
-      setError('Pick a category or type a new one.')
+      setError(p.pickCategory)
       return
     }
 
     const idChanged = form.mode === 'add' || form.original?.id !== id
     const duplicate = idChanged ? videos.find((v) => v.id === id) : undefined
     if (duplicate) {
-      setError(
-        `That video is already in the list ("${duplicate.title}")${duplicate.hidden ? ' — it is hidden; unhide it instead.' : '.'}`,
-      )
+      setError(p.duplicate(duplicate.title, !!duplicate.hidden))
       return
     }
 
@@ -232,25 +232,25 @@ export default function ParentPanel({
       op = form.mode === 'add' ? { type: 'add', video } : { type: 'update', video }
     }
 
-    const ok = await runOp(op, form.mode === 'add' ? 'Added' : 'Saved')
+    const ok = await runOp(op, form.mode === 'add' ? p.added : p.saved)
     if (ok) setForm(null)
   }
 
   async function toggleHidden(v: Video) {
     const hide = !v.hidden
-    await runOp({ type: 'setHidden', id: v.id, hidden: hide }, hide ? 'Hidden from the kids’ page' : 'Shown again')
+    await runOp({ type: 'setHidden', id: v.id, hidden: hide }, hide ? p.hiddenNotice : p.shownAgain)
   }
 
   async function deleteVideo(v: Video) {
-    if (!window.confirm(`Remove "${v.title}" from the list?`)) return
-    await runOp({ type: 'delete', id: v.id }, 'Removed')
+    if (!window.confirm(p.confirmRemove(v.title))) return
+    await runOp({ type: 'delete', id: v.id }, p.removed)
   }
 
   /* ---- sync tab actions ---- */
 
   async function connectExisting() {
     if (!token.trim() || !gistId.trim()) {
-      setError('Enter both a token and a Gist ID.')
+      setError(p.needTokenAndGist)
       return
     }
     setBusy(true)
@@ -265,7 +265,7 @@ export default function ParentPanel({
         await commitOp(videos, { type: 'replace', videos })
       }
       await onRefresh()
-      setNotice('Connected. This device now shares the cloud list.')
+      setNotice(p.connected)
     } catch (err: any) {
       setError(err?.message || String(err))
     } finally {
@@ -275,7 +275,7 @@ export default function ParentPanel({
 
   async function createShared() {
     if (!token.trim()) {
-      setError('Enter a GitHub token first.')
+      setError(p.needToken)
       return
     }
     setBusy(true)
@@ -290,7 +290,7 @@ export default function ParentPanel({
       setGistConfig({ token: token.trim(), gistId: id, filename: 'kiddietube-videos.json' })
       setGistId(id)
       await onRefresh()
-      setNotice('Shared list created. Connect other devices with this same token + Gist ID.')
+      setNotice(p.sharedCreated)
     } catch (err: any) {
       setError(err?.message || String(err))
     } finally {
@@ -304,8 +304,8 @@ export default function ParentPanel({
     setNotice(null)
     try {
       const source = await onRefresh()
-      if (source === 'gist') setNotice('List refreshed from the cloud.')
-      else setError("Couldn't reach the cloud list — showing this device's saved copy.")
+      if (source === 'gist') setNotice(p.refreshed)
+      else setError(p.cloudUnreachable)
     } catch (err: any) {
       setError(err?.message || String(err))
     } finally {
@@ -322,11 +322,11 @@ export default function ParentPanel({
       if (cfg) setGistConfig({ ...cfg, gistId: '' })
       setGistId('')
     }
-    setNotice('Disconnected on this device. The cloud list is unchanged.')
+    setNotice(p.disconnected)
   }
 
   async function resetToBundled() {
-    if (!window.confirm('Replace the whole list with the original bundled videos? This cannot be undone.')) {
+    if (!window.confirm(p.confirmReset)) {
       return
     }
     setBusy(true)
@@ -337,7 +337,7 @@ export default function ParentPanel({
       if (!isGistConfigured()) clearCache()
       const next = await commitOp(videos, { type: 'replace', videos: seed.videos })
       onVideosChange(next)
-      setNotice('List reset to the bundled videos.')
+      setNotice(p.resetDone)
     } catch (err: any) {
       setError(err?.message || String(err))
     } finally {
@@ -346,14 +346,14 @@ export default function ParentPanel({
   }
 
   function savePin() {
-    const p = pinInput.trim()
-    if (p && !/^\d{4,8}$/.test(p)) {
-      setError('PIN must be 4–8 digits (or leave blank to remove).')
+    const pin = pinInput.trim()
+    if (pin && !/^\d{4,8}$/.test(pin)) {
+      setError(p.pinInvalid)
       return
     }
-    setPin(p || null)
+    setPin(pin || null)
     setPinInput('')
-    setNotice(p ? 'Parent PIN set.' : 'Parent PIN removed.')
+    setNotice(pin ? p.pinSet : p.pinRemoved)
   }
 
   /* ---------------------------------------------------------------- */
@@ -369,11 +369,11 @@ export default function ParentPanel({
   const connected = isGistConfigured()
 
   return (
-    <div className="pp-overlay" role="dialog" aria-modal="true" aria-label="Parent panel">
+    <div className="pp-overlay" role="dialog" aria-modal="true" aria-label={p.panel}>
       <div className="pp-sheet">
         <header className="pp-header">
-          <span className="pp-title">Parent panel</span>
-          <button className="pp-x" onClick={onClose} aria-label="Close">
+          <span className="pp-title">{p.panel}</span>
+          <button className="pp-x" onClick={onClose} aria-label={p.close}>
             ✕
           </button>
         </header>
@@ -383,19 +383,19 @@ export default function ParentPanel({
             className={`pp-tab ${tab === 'videos' ? 'active' : ''}`}
             onClick={() => setTab('videos')}
           >
-            Videos ({videos.length})
+            {p.tabVideos(videos.length)}
           </button>
           <button
             className={`pp-tab ${tab === 'sync' ? 'active' : ''}`}
             onClick={() => setTab('sync')}
           >
-            Sync {connected ? '✓' : ''}
+            {p.tabSync} {connected ? '✓' : ''}
           </button>
           <button
             className={`pp-tab ${tab === 'theme' ? 'active' : ''}`}
             onClick={() => setTab('theme')}
           >
-            Theme
+            {p.tabTheme}
           </button>
         </div>
 
@@ -408,16 +408,16 @@ export default function ParentPanel({
               <div className="pp-toolbar">
                 <input
                   className="pp-input"
-                  placeholder="Filter…"
+                  placeholder={p.filter}
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
                 />
                 <button className="pp-btn pp-btn-primary" onClick={openAddForm} disabled={busy}>
-                  + Add video
+                  {p.addVideo}
                 </button>
               </div>
 
-              <div className="pp-seg" role="group" aria-label="Show">
+              <div className="pp-seg" role="group" aria-label={p.show}>
                 {(['all', 'visible', 'hidden'] as const).map((k) => (
                   <button
                     key={k}
@@ -426,10 +426,10 @@ export default function ParentPanel({
                     aria-pressed={show === k}
                   >
                     {k === 'all'
-                      ? `All (${videos.length})`
+                      ? p.showAll(videos.length)
                       : k === 'visible'
-                        ? `Visible (${videos.length - hiddenCount})`
-                        : `Hidden (${hiddenCount})`}
+                        ? p.showVisible(videos.length - hiddenCount)
+                        : p.showHidden(hiddenCount)}
                   </button>
                 ))}
               </div>
@@ -441,39 +441,39 @@ export default function ParentPanel({
                     <div className="pp-row-main">
                       <div className="pp-row-title">{v.title}</div>
                       <div className="pp-row-cat">
-                        {v.hidden && <span className="pp-tag">Hidden</span>}
+                        {v.hidden && <span className="pp-tag">{p.tagHidden}</span>}
                         {v.category}
                       </div>
                     </div>
                     <div className="pp-row-actions">
                       <button className="pp-btn pp-btn-ghost" onClick={() => openEditForm(v)} disabled={busy}>
-                        Edit
+                        {p.edit}
                       </button>
                       <button
                         className="pp-btn pp-btn-ghost"
                         onClick={() => toggleHidden(v)}
                         disabled={busy}
-                        title={v.hidden ? 'Show on the kids’ page again' : 'Hide from the kids’ page (keeps it in the list)'}
+                        title={v.hidden ? p.showTitle : p.hideTitle}
                       >
-                        {v.hidden ? 'Unhide' : 'Hide'}
+                        {v.hidden ? p.unhide : p.hide}
                       </button>
                       <button className="pp-btn pp-btn-danger" onClick={() => deleteVideo(v)} disabled={busy}>
-                        Delete
+                        {p.delete}
                       </button>
                     </div>
                   </li>
                 ))}
-                {filtered.length === 0 && <li className="pp-empty">No videos match.</li>}
+                {filtered.length === 0 && <li className="pp-empty">{p.noMatch}</li>}
               </ul>
             </>
           )}
 
           {tab === 'videos' && form && (
             <div className="pp-form">
-              <h3 className="pp-form-title">{form.mode === 'add' ? 'Add a video' : 'Edit video'}</h3>
+              <h3 className="pp-form-title">{form.mode === 'add' ? p.addAVideo : p.editVideo}</h3>
 
               <label className="pp-field">
-                <span>YouTube link or video ID</span>
+                <span>{p.linkLabel}</span>
                 <input
                   className="pp-input"
                   value={form.url}
@@ -483,10 +483,10 @@ export default function ParentPanel({
                 />
                 <small className="pp-hint">
                   {fetchingMeta
-                    ? 'Fetching title…'
+                    ? p.fetchingTitle
                     : form.videoId
-                      ? `Video ID: ${form.videoId}`
-                      : 'Paste a link — the title fills in automatically.'}
+                      ? p.videoId(form.videoId)
+                      : p.pasteHint}
                 </small>
               </label>
 
@@ -495,7 +495,7 @@ export default function ParentPanel({
               )}
 
               <label className="pp-field">
-                <span>Title</span>
+                <span>{p.title}</span>
                 <input
                   className="pp-input"
                   value={form.title}
@@ -506,7 +506,7 @@ export default function ParentPanel({
               </label>
 
               <label className="pp-field">
-                <span>Category</span>
+                <span>{p.category}</span>
                 <select
                   className="pp-input"
                   value={form.category}
@@ -517,17 +517,17 @@ export default function ParentPanel({
                       {c}
                     </option>
                   ))}
-                  <option value={NEW_CATEGORY}>➕ New category…</option>
+                  <option value={NEW_CATEGORY}>{p.newCategoryOption}</option>
                 </select>
               </label>
 
               {form.category === NEW_CATEGORY && (
                 <label className="pp-field">
-                  <span>New category name</span>
+                  <span>{p.newCategoryName}</span>
                   <input
                     className="pp-input"
                     value={form.newCategory}
-                    placeholder="e.g. Doğa / Nature"
+                    placeholder={p.newCategoryPh}
                     onChange={(e) => setForm((f) => (f ? { ...f, newCategory: e.target.value } : f))}
                   />
                 </label>
@@ -535,10 +535,10 @@ export default function ParentPanel({
 
               <div className="pp-form-actions">
                 <button className="pp-btn pp-btn-ghost" onClick={() => setForm(null)} disabled={busy}>
-                  Cancel
+                  {p.cancel}
                 </button>
                 <button className="pp-btn pp-btn-primary" onClick={saveForm} disabled={busy}>
-                  {busy ? 'Saving…' : form.mode === 'add' ? 'Add' : 'Save'}
+                  {busy ? p.saving : form.mode === 'add' ? p.add : p.save}
                 </button>
               </div>
             </div>
@@ -547,8 +547,9 @@ export default function ParentPanel({
           {tab === 'theme' && (
             <div className="pp-themes">
               <p className="pp-sync-status">
-                Pick how the app looks. Saved on <b>this device only</b> — other devices keep their own
-                theme.
+                {p.themeIntro[0]}
+                <b>{p.themeIntro[1]}</b>
+                {p.themeIntro[2]}
               </p>
               <div className="pp-theme-grid">
                 {THEMES.map((t) => (
@@ -572,11 +573,32 @@ export default function ParentPanel({
                     </span>
                     <span className="pp-theme-label">
                       <span>
-                        {t.emoji} {t.name} <small>/ {t.en}</small>
+                        {t.emoji} {themeName(t)}
                       </span>
-                      {t.id === DEFAULT_THEME && <span className="pp-tag">Default</span>}
+                      {t.id === DEFAULT_THEME && <span className="pp-tag">{p.defaultTag}</span>}
                       {themeId === t.id && <span className="pp-theme-check">✓</span>}
                     </span>
+                  </button>
+                ))}
+              </div>
+              <p className="pp-sync-status">{p.language}</p>
+              <div className="pp-form-actions pp-wrap">
+                {(
+                  [
+                    ['tr', '🇹🇷 Türkçe'],
+                    ['en', '🇬🇧 English'],
+                  ] as const
+                ).map(([code, label]) => (
+                  <button
+                    key={code}
+                    className={`pp-btn ${getLang() === code ? 'pp-btn-primary' : 'pp-btn-ghost'}`}
+                    aria-pressed={getLang() === code}
+                    onClick={() => {
+                      setLang(code)
+                      window.location.reload()
+                    }}
+                  >
+                    {label}
                   </button>
                 ))}
               </div>
@@ -587,22 +609,23 @@ export default function ParentPanel({
             <div className="pp-sync">
               <p className="pp-sync-status">
                 {connected
-                  ? `Connected — edits sync across every device using this Gist.`
-                  : `Not connected — edits stay on this device only.`}
+                  ? p.syncConnected
+                  : p.syncNotConnected}
               </p>
 
               <label className="pp-field">
-                <span>GitHub personal access token</span>
+                <span>{p.tokenLabel}</span>
                 <input
                   className="pp-input"
                   type="password"
                   value={token}
-                  placeholder="ghp_… (scope: gist only)"
+                  placeholder={p.tokenPh}
                   onChange={(e) => setToken(e.target.value)}
                 />
                 <small className="pp-hint">
-                  Create at github.com/settings/tokens with the <b>gist</b> scope only. Stored on this
-                  device.
+                  {p.tokenHint[0]}
+                  <b>{p.tokenHint[1]}</b>
+                  {p.tokenHint[2]}
                 </small>
               </label>
 
@@ -611,21 +634,21 @@ export default function ParentPanel({
                 <input
                   className="pp-input"
                   value={gistId}
-                  placeholder="leave blank and press “Create shared list”"
+                  placeholder={p.gistPh}
                   onChange={(e) => setGistId(e.target.value)}
                 />
               </label>
 
               <div className="pp-form-actions pp-wrap">
                 <button className="pp-btn pp-btn-primary" onClick={connectExisting} disabled={busy}>
-                  Connect to Gist
+                  {p.connect}
                 </button>
                 <button className="pp-btn pp-btn-ghost" onClick={createShared} disabled={busy}>
-                  Create shared list
+                  {p.createShared}
                 </button>
                 {connected && (
                   <button className="pp-btn pp-btn-ghost" onClick={refreshFromCloud} disabled={busy}>
-                    Refresh from cloud
+                    {p.refresh}
                   </button>
                 )}
               </div>
@@ -633,10 +656,10 @@ export default function ParentPanel({
               {connected && (
                 <div className="pp-form-actions pp-wrap">
                   <button className="pp-btn pp-btn-ghost" onClick={() => disconnect(false)} disabled={busy}>
-                    Disconnect (keep token)
+                    {p.disconnectKeep}
                   </button>
                   <button className="pp-btn pp-btn-danger" onClick={() => disconnect(true)} disabled={busy}>
-                    Remove token from device
+                    {p.removeToken}
                   </button>
                 </div>
               )}
@@ -644,30 +667,30 @@ export default function ParentPanel({
               <hr className="pp-hr" />
 
               <label className="pp-field">
-                <span>Parent PIN (optional)</span>
+                <span>{p.pinLabel}</span>
                 <input
                   className="pp-input"
                   inputMode="numeric"
                   value={pinInput}
-                  placeholder={hasPin() ? 'enter new PIN, or blank to remove' : '4–8 digits'}
+                  placeholder={hasPin() ? p.pinNewPh : p.pinDigitsPh}
                   onChange={(e) => setPinInput(e.target.value)}
                 />
                 <small className="pp-hint">
                   {hasPin()
-                    ? 'A PIN is set. This panel asks for it before opening.'
-                    : 'Set a PIN so the panel asks before it opens.'}
+                    ? p.pinIsSet
+                    : p.pinNotSet}
                 </small>
               </label>
               <div className="pp-form-actions">
                 <button className="pp-btn pp-btn-ghost" onClick={savePin} disabled={busy}>
-                  {pinInput.trim() ? 'Save PIN' : hasPin() ? 'Remove PIN' : 'Save PIN'}
+                  {pinInput.trim() ? p.savePin : hasPin() ? p.removePin : p.savePin}
                 </button>
               </div>
 
               <hr className="pp-hr" />
 
               <button className="pp-btn pp-btn-danger" onClick={resetToBundled} disabled={busy}>
-                Reset list to bundled videos
+                {p.resetList}
               </button>
             </div>
           )}
@@ -679,10 +702,10 @@ export default function ParentPanel({
 
 export function requestParentAccess(): boolean {
   if (!hasPin()) return true
-  const entry = window.prompt('Parent PIN')
+  const entry = window.prompt(t.parentPin)
   if (entry == null) return false
   if (!verifyPin(entry)) {
-    window.alert('Wrong PIN')
+    window.alert(t.wrongPin)
     return false
   }
   return true

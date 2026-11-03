@@ -70,3 +70,21 @@ test('an uninvited email cannot create an account', async ({ page }) => {
   await expect(page.locator('.pp-error')).toBeVisible()
   await expect(page.getByLabel('Family name')).toHaveCount(0)
 })
+
+test.describe('Turkish device', () => {
+  test.use({ locale: 'tr-TR' })
+
+  test('the console and server messages are in Turkish; the language can be switched', async ({ page }) => {
+    await page.goto('./join')
+    await page.getByLabel('Adınız').fill('Yabancı')
+    await page.getByLabel(/^E-posta/).fill('yabanci@example.com')
+    await page.getByLabel(/^Şifre/).fill('correct-horse-battery')
+    await page.getByRole('button', { name: 'Hesap oluştur' }).click()
+    await expect(page.locator('.pp-error')).toHaveText('Bu e-posta kayıt olamaz. Davetin gönderildiği adresi tam olarak kullanın.')
+
+    await page.goto('./parent')
+    await expect(page.getByRole('heading', { name: 'Ebeveyn girişi' })).toBeVisible()
+    await page.getByLabel('Dil').selectOption('en')
+    await expect(page.getByRole('heading', { name: 'Parent sign-in' })).toBeVisible()
+  })
+})

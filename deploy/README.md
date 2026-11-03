@@ -82,9 +82,12 @@ that without a password if you want hands-off deploys:
 3. On each kid's device: open `https://kids.tinyapps.dev`, **Set up this
    device**, sign in, Kids → add the kid → **Use this device**. Install it to
    the home screen. Then set a parent PIN (Settings).
-4. Add to `/opt/server-configs/backup.sh`:
+4. Backups: the nightly server backup (`/etc/cron.d/server-backup`, 20:00,
+   runs `/usr/local/bin/backup.sh`) already dumps **every** database, so the
+   `kiddietube` DB is included automatically. Only the secrets need adding, in
+   section "2. App .env files" of `/usr/local/bin/backup.sh` (and the copy in
+   `/opt/server-configs`, which is older than the live script):
    ```bash
-   sudo -u postgres pg_dump -Fc kiddietube > "$WORK/db/kiddietube.dump"
    cp /opt/kiddietube/.env "$WORK/env/kiddietube.env"
    ```
 5. Uptime Kuma: HTTP monitor on `https://kids.tinyapps.dev/api/v1/health`.

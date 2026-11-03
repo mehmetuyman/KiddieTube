@@ -11,6 +11,7 @@ import type { Db } from './db/client.ts'
 import { createMailer, type Mailer } from './email.ts'
 import type { AppContext } from './http/context.ts'
 import { errorHandler } from './http/errors.ts'
+import { INVITE_ONLY, langOf, translate } from './lib/i18n.ts'
 import { fetchYouTubeMeta, type YouTubeMeta } from './lib/youtube.ts'
 import { contentRoutes } from './routes/content.ts'
 import { familyRoutes } from './routes/families.ts'
@@ -64,7 +65,7 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
     if (!req.url.startsWith('/api/v1/') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return
     const origin = req.headers.origin
     if (origin && origin !== appOrigin) {
-      return reply.status(403).send({ error: { code: 'bad_origin', message: 'Cross-site request refused' } })
+      return reply.status(403).send({ error: { code: 'bad_origin', message: translate('Cross-site request refused', langOf(req.headers)) } })
     }
   })
 
@@ -82,11 +83,25 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
       )
       reply.status(response.status)
       response.headers.forEach((value, key) => {
-        if (key.toLowerCase() !== 'set-cookie') reply.header(key, value)
+        const k = key.toLowerCase()
+        if (k !== 'set-cookie' && k !== 'content-length') reply.header(key, value)
       })
       const cookies = response.headers.getSetCookie()
       if (cookies.length) reply.header('set-cookie', cookies)
-      return reply.send(response.body ? await response.text() : null)
+      let text = response.body ? await response.text() : null
+      // Error messages in the device's language (and a clear one for the
+      // invite-only sign-up refusal, which Better Auth reports generically)
+      if (text && response.status >= 400) {
+        try {
+          const body = JSON.parse(text) as { message?: string; code?: string }
+          if (body.code === 'FAILED_TO_CREATE_USER' && url.pathname.endsWith('/sign-up/email')) body.message = INVITE_ONLY
+          if (body.message) body.message = translate(body.message, langOf(req.headers))
+          text = JSON.stringify(body)
+        } catch {
+          /* not JSON: pass through */
+        }
+      }
+      return reply.send(text)
     },
   })
 

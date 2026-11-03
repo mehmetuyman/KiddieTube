@@ -89,3 +89,6 @@ export const t: Dict = DICTS[getLang()]
 
 /** The <html lang> value. */
 export const htmlLang = (): Lang => getLang()
+
+/** A theme's name in this device's language. */
+export const themeName = (theme: { name: string; en: string }): string => (getLang() === 'tr' ? theme.name : theme.en)

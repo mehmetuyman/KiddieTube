@@ -9,6 +9,8 @@ import { CategoriesPage, DevicesPage, ProfilesPage, VideosPage } from './FamilyP
 import { AdminPage, MembersPage, SettingsPage } from './SettingsPages'
 import './console.css'
 import GetStarted from './GetStarted'
+import { c } from './strings'
+import { getLang, setLang, type Lang } from '../lib/i18n'
 
 export interface Me {
   user: { id: string; email: string; name: string; isAdmin: boolean }
@@ -48,7 +50,7 @@ export default function ParentConsole() {
   if (path.startsWith('/join')) return <Shell><Join me={me} onDone={loadMe} /></Shell>
   if (path.startsWith('/accept')) return <Shell><AcceptInvite me={me} onDone={loadMe} /></Shell>
 
-  if (me === undefined) return <Shell><p className="pc-muted">Loading…</p></Shell>
+  if (me === undefined) return <Shell><p className="pc-muted">{c.loading}</p></Shell>
   if (offline && !me) return <Shell><OfflineNotice /></Shell>
   if (!me) return <Shell><SignIn onDone={loadMe} /></Shell>
 
@@ -59,9 +61,12 @@ function Shell({ children, wide = false }: { children: ReactNode; wide?: boolean
   return (
     <div className="pc-page">
       <div className={`pc-card ${wide ? 'pc-wide' : ''}`}>
-        <div className="pc-brand" onClick={() => navigate('/')} role="link">
-          <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="" className="pc-logo" />
-          <span>Kiddie Tube</span>
+        <div className="pc-header">
+          <div className="pc-brand" onClick={() => navigate('/')} role="link">
+            <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="" className="pc-logo" />
+            <span>Kiddie Tube</span>
+          </div>
+          <LanguageSelect />
         </div>
         {children}
       </div>
@@ -69,10 +74,28 @@ function Shell({ children, wide = false }: { children: ReactNode; wide?: boolean
   )
 }
 
+/** This device's language (kids' page, console, emails); reloads to apply. */
+export function LanguageSelect() {
+  return (
+    <select
+      className="pc-lang"
+      aria-label={c.language}
+      value={getLang()}
+      onChange={(e) => {
+        setLang(e.target.value as Lang)
+        window.location.reload()
+      }}
+    >
+      <option value="tr">🇹🇷 Türkçe</option>
+      <option value="en">🇬🇧 English</option>
+    </select>
+  )
+}
+
 export function OfflineNotice() {
   return (
     <div className="pp-error">
-      The Kiddie Tube server can’t be reached right now, so changes are paused. Videos keep playing on the kids’ devices. Try again later.
+      {c.offline}
     </div>
   )
 }
@@ -80,12 +103,12 @@ export function OfflineNotice() {
 /* ---------------------------- signed in ---------------------------- */
 
 const PAGES = [
-  { path: '/parent/videos', label: 'Videos', icon: '🎬' },
-  { path: '/parent/categories', label: 'Categories', icon: '🗂️' },
-  { path: '/parent/profiles', label: 'Kids', icon: '🧒' },
-  { path: '/parent/devices', label: 'Devices', icon: '📱' },
-  { path: '/parent/members', label: 'Parents', icon: '👪' },
-  { path: '/parent/settings', label: 'Settings', icon: '⚙️' },
+  { path: '/parent/videos', label: c.nav.videos, icon: '🎬' },
+  { path: '/parent/categories', label: c.nav.categories, icon: '🗂️' },
+  { path: '/parent/profiles', label: c.nav.kids, icon: '🧒' },
+  { path: '/parent/devices', label: c.nav.devices, icon: '📱' },
+  { path: '/parent/members', label: c.nav.parents, icon: '👪' },
+  { path: '/parent/settings', label: c.nav.settings, icon: '⚙️' },
 ]
 
 function SignedIn({ me, path, reloadMe }: { me: Me; path: string; reloadMe: () => Promise<void> }) {
@@ -115,7 +138,7 @@ function SignedIn({ me, path, reloadMe }: { me: Me; path: string; reloadMe: () =
         {me.user.isAdmin ? (
           <CreateFamily onCreated={async (f) => (await reloadMe(), setFamilyId(f.id))} />
         ) : (
-          <p className="pc-muted">You’re not part of a family yet. Ask the person who invited you for a new invitation link.</p>
+          <p className="pc-muted">{c.noFamily}</p>
         )}
       </Shell>
     )
@@ -166,15 +189,15 @@ function TopBar({ me, family, setFamilyId }: { me: Me; family: Family | null; se
       )}
       <span className="pc-spacer" />
       <button className="pp-btn pp-btn-ghost" onClick={() => navigate('/')}>
-        ← Kids’ view
+        {c.kidsView}
       </button>
       {me.user.isAdmin && (
         <button className="pp-btn pp-btn-ghost" onClick={() => navigate('/parent/admin')}>
-          Admin
+          {c.admin}
         </button>
       )}
       <button className="pp-btn pp-btn-ghost" onClick={signOut} title={me.user.email}>
-        Sign out
+        {c.signOut}
       </button>
     </div>
   )
@@ -198,15 +221,15 @@ function CreateFamily({ onCreated, inviteToken }: { onCreated: (f: Family) => vo
   }
   return (
     <form onSubmit={submit} className="pp-form">
-      <h3 className="pp-form-title">Create your family</h3>
-      <p className="pc-muted">It starts empty and private: only parents you invite can see or change it.</p>
+      <h3 className="pp-form-title">{c.createFamilyTitle}</h3>
+      <p className="pc-muted">{c.createFamilyText}</p>
       {error && <div className="pp-error">{error}</div>}
       <label className="pp-field">
-        <span>Family name</span>
-        <input className="pp-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. The Yılmaz family" required />
+        <span>{c.familyName}</span>
+        <input className="pp-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={c.familyNamePh} required />
       </label>
       <button className="pp-btn pp-btn-primary" disabled={busy || !name.trim()}>
-        {busy ? 'Creating…' : 'Create family'}
+        {busy ? c.creating : c.createFamily}
       </button>
     </form>
   )
@@ -230,17 +253,17 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
       await onDone()
       if (!window.location.pathname.includes('/parent')) navigate('/parent/videos', { replace: true })
     } catch (err) {
-      setError(err instanceof ApiRequestError && err.status === 401 ? 'Wrong email or password.' : errorText(err))
+      setError(err instanceof ApiRequestError && err.status === 401 ? c.wrongLogin : errorText(err))
     } finally {
       setBusy(false)
     }
   }
   const forgot = async () => {
-    if (!email) return setError('Enter your email first.')
+    if (!email) return setError(c.enterEmailFirst)
     setError(null)
     try {
       await authApi.requestReset(email)
-      setNotice('If that email has an account, a reset link is on its way.')
+      setNotice(c.resetSent)
     } catch (err) {
       setError(errorText(err))
     }
@@ -248,15 +271,15 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
 
   return (
     <form onSubmit={submit} className="pp-form">
-      <h3 className="pp-form-title">Parent sign-in</h3>
+      <h3 className="pp-form-title">{c.signInTitle}</h3>
       {error && <div className="pp-error">{error}</div>}
       {notice && <div className="pp-notice">{notice}</div>}
       <label className="pp-field">
-        <span>Email</span>
+        <span>{c.email}</span>
         <input className="pp-input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </label>
       <label className="pp-field">
-        <span>Password</span>
+        <span>{c.password}</span>
         <input
           className="pp-input"
           type="password"
@@ -268,13 +291,13 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
       </label>
       <div className="pp-form-actions">
         <button type="button" className="pp-btn pp-btn-ghost" onClick={forgot}>
-          Forgot password?
+          {c.forgot}
         </button>
         <button className="pp-btn pp-btn-primary" disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign in'}
+          {busy ? c.signingIn : c.signIn}
         </button>
       </div>
-      <p className="pc-muted">Kiddie Tube is invite-only. New here? Use the link in your invitation email.</p>
+      <p className="pc-muted">{c.inviteOnly}</p>
     </form>
   )
 }
@@ -293,11 +316,7 @@ function SignUpForm({ email: presetEmail, onDone, title }: { email?: string; onD
       await authApi.signUp(email, password, name)
       await onDone()
     } catch (err) {
-      setError(
-        err instanceof ApiRequestError && err.status === 400 && /email/i.test(err.message) === false
-          ? 'This email can’t register. Use the exact address the invitation was sent to.'
-          : errorText(err),
-      )
+      setError(errorText(err))
     } finally {
       setBusy(false)
     }
@@ -307,15 +326,15 @@ function SignUpForm({ email: presetEmail, onDone, title }: { email?: string; onD
       <h3 className="pp-form-title">{title}</h3>
       {error && <div className="pp-error">{error}</div>}
       <label className="pp-field">
-        <span>Your name</span>
+        <span>{c.yourName}</span>
         <input className="pp-input" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required />
       </label>
       <label className="pp-field">
-        <span>Email (the one the invitation was sent to)</span>
+        <span>{c.inviteEmail}</span>
         <input className="pp-input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </label>
       <label className="pp-field">
-        <span>Password (at least 10 characters)</span>
+        <span>{c.passwordMin}</span>
         <input
           className="pp-input"
           type="password"
@@ -327,14 +346,14 @@ function SignUpForm({ email: presetEmail, onDone, title }: { email?: string; onD
         />
       </label>
       <button className="pp-btn pp-btn-primary" disabled={busy}>
-        {busy ? 'Creating account…' : 'Create account'}
+        {busy ? c.creatingAccount : c.createAccount}
       </button>
       <p className="pc-muted">
-        Already have an account?{' '}
+        {c.haveAccount[0]}
         <a href="#" onClick={(e) => (e.preventDefault(), navigate('/parent'))}>
-          Sign in
-        </a>{' '}
-        and open the link again.
+          {c.haveAccount[1]}
+        </a>
+        {c.haveAccount[2]}
       </p>
     </form>
   )
@@ -343,15 +362,15 @@ function SignUpForm({ email: presetEmail, onDone, title }: { email?: string; onD
 /** /join?invite=…  — create an account (if needed) and a new family. */
 function Join({ me, onDone }: { me: Me | null | undefined; onDone: () => Promise<void> }) {
   const token = query('invite') ?? ''
-  if (me === undefined) return <p className="pc-muted">Loading…</p>
+  if (me === undefined) return <p className="pc-muted">{c.loading}</p>
   // No invite token: first-time sign-up of the instance admin (the server only
   // accepts admin emails or invited ones), then on to create a family.
   if (!token) {
-    if (!me) return <SignUpForm title="Create your account" onDone={async () => (await onDone(), navigate('/parent', { replace: true }))} />
+    if (!me) return <SignUpForm title={c.createYourAccount} onDone={async () => (await onDone(), navigate('/parent', { replace: true }))} />
     navigate('/parent', { replace: true })
     return null
   }
-  if (!me) return <SignUpForm title="Welcome! Create your parent account" onDone={onDone} />
+  if (!me) return <SignUpForm title={c.welcomeCreate} onDone={onDone} />
   return <CreateFamily inviteToken={token} onCreated={async () => (await onDone(), navigate('/parent/profiles', { replace: true }))} />
 }
 
@@ -360,9 +379,9 @@ function AcceptInvite({ me, onDone }: { me: Me | null | undefined; onDone: () =>
   const id = query('invitation') ?? ''
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  if (!id) return <div className="pp-error">This invitation link is incomplete.</div>
-  if (me === undefined) return <p className="pc-muted">Loading…</p>
-  if (!me) return <SignUpForm title="You’re invited! Create your parent account" onDone={onDone} />
+  if (!id) return <div className="pp-error">{c.inviteIncomplete}</div>
+  if (me === undefined) return <p className="pc-muted">{c.loading}</p>
+  if (!me) return <SignUpForm title={c.invitedCreate} onDone={onDone} />
   const accept = async () => {
     setBusy(true)
     try {
@@ -378,11 +397,11 @@ function AcceptInvite({ me, onDone }: { me: Me | null | undefined; onDone: () =>
   }
   return (
     <div className="pp-form">
-      <h3 className="pp-form-title">Join this family</h3>
+      <h3 className="pp-form-title">{c.joinFamily}</h3>
       {error && <div className="pp-error">{error}</div>}
-      <p className="pc-muted">Signed in as {me.user.email}.</p>
+      <p className="pc-muted">{c.signedInAs(me.user.email)}</p>
       <button className="pp-btn pp-btn-primary" onClick={accept} disabled={busy}>
-        {busy ? 'Joining…' : 'Accept invitation'}
+        {busy ? c.joining : c.acceptInvitation}
       </button>
     </div>
   )
@@ -393,7 +412,7 @@ function ResetPassword() {
   const token = query('token') ?? ''
   const [password, setPassword] = useState('')
   const [done, setDone] = useState(false)
-  const [error, setError] = useState<string | null>(query('error') ? 'This reset link is invalid or has expired.' : null)
+  const [error, setError] = useState<string | null>(query('error') ? c.resetInvalid : null)
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     try {
@@ -406,22 +425,22 @@ function ResetPassword() {
   if (done)
     return (
       <div className="pp-form">
-        <div className="pp-notice">Password changed. You can sign in now.</div>
+        <div className="pp-notice">{c.passwordChanged}</div>
         <button className="pp-btn pp-btn-primary" onClick={() => navigate('/parent', { replace: true })}>
-          Sign in
+          {c.signIn}
         </button>
       </div>
     )
   return (
     <form onSubmit={submit} className="pp-form">
-      <h3 className="pp-form-title">Choose a new password</h3>
+      <h3 className="pp-form-title">{c.newPasswordTitle}</h3>
       {error && <div className="pp-error">{error}</div>}
       <label className="pp-field">
-        <span>New password (at least 10 characters)</span>
+        <span>{c.newPasswordLabel}</span>
         <input className="pp-input" type="password" autoComplete="new-password" minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} required />
       </label>
       <button className="pp-btn pp-btn-primary" disabled={!token}>
-        Save password
+        {c.savePassword}
       </button>
     </form>
   )

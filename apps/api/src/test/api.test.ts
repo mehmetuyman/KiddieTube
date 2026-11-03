@@ -375,3 +375,52 @@ describe('PIN lockout escalation', () => {
     expect(pinLockMs(50) / min).toBe(5 * 256)
   })
 })
+
+describe('language', () => {
+  const TR = { 'x-kt-lang': 'tr' }
+
+  it('answers errors in the device language (header, then Accept-Language), English otherwise', async () => {
+    const admin = new Client(h)
+    await admin.signIn(ADMIN_EMAIL)
+    const fam = (await admin.req('POST', '/api/v1/families', { name: 'Dil Ailesi' })).body.id
+    const en = await admin.req('POST', `/api/v1/families/${fam}/videos`, { url: 'not a link' })
+    expect(en.body.error.message).toBe('Not a YouTube link or video id')
+    const tr = await admin.req('POST', `/api/v1/families/${fam}/videos`, { url: 'not a link' }, TR)
+    expect(tr.status).toBe(400)
+    expect(tr.body.error.message).toBe('Bu bir YouTube bağlantısı ya da video kimliği değil.')
+    const viaAccept = await admin.req('GET', '/api/v1/families/nope/videos', undefined, { 'accept-language': 'tr-TR,tr;q=0.9' })
+    expect(viaAccept.body.error.message).toBe('Bu ailenin üyesi değilsiniz.')
+    const imp = await admin.req('POST', `/api/v1/families/${fam}/videos/import`, { urls: ['nope'], categoryId: null }, TR)
+    expect(imp.body.results[0]).toMatchObject({ ok: false, error: 'Bu bir YouTube bağlantısı ya da video kimliği değil.' })
+  })
+
+  it('translates sign-in errors and explains the invite-only refusal', async () => {
+    const wrong = await new Client(h).req('POST', '/api/auth/sign-in/email', { email: ADMIN_EMAIL, password: 'wrong-password-1' }, TR)
+    expect(wrong.status).toBe(401)
+    expect(wrong.body.message).toBe('E-posta ya da şifre yanlış.')
+    const stranger = await new Client(h).req(
+      'POST',
+      '/api/auth/sign-up/email',
+      { email: 'nobody@example.com', password: 'long-enough-pass', name: 'X' },
+      TR,
+    )
+    expect(stranger.status).toBeGreaterThanOrEqual(400)
+    expect(stranger.body.message).toBe('Bu e-posta kayıt olamaz. Davetin gönderildiği adresi tam olarak kullanın.')
+    const strangerEn = await new Client(h).signUp('nobody2@example.com')
+    expect(strangerEn.body.message).toBe('This email can’t register. Use the exact address the invitation was sent to.')
+  })
+
+  it('sends invitation and password-reset emails in the sender’s language', async () => {
+    const admin = new Client(h)
+    await admin.signIn(ADMIN_EMAIL)
+    await admin.req('POST', '/api/v1/admin/family-invites', { email: 'ayse@example.com' }, TR)
+    const invite = h.outbox.findLast((m) => m.to === 'ayse@example.com')!
+    expect(invite.subject).toContain('Kiddie Tube’a davet etti')
+    expect(invite.html).toContain('lang="tr"')
+    expect(invite.text).toMatch(/invite=/)
+
+    await new Client(h).req('POST', '/api/auth/request-password-reset', { email: ADMIN_EMAIL, redirectTo: '/reset-password' }, TR)
+    const reset = h.outbox.findLast((m) => m.to === ADMIN_EMAIL)!
+    expect(reset.subject).toBe('Kiddie Tube şifrenizi sıfırlayın')
+  })
+})

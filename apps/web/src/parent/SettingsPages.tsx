@@ -4,7 +4,9 @@ import type { Family } from '@kiddietube/shared'
 import { api, request } from '../server/api'
 import { clearPairing, getPairing } from '../server/device'
 import { THEMES, getTheme, setTheme, type ThemeId } from '../lib/theme'
-import { getLang, setLang } from '../lib/i18n'
+import { themeName } from '../lib/i18n'
+import { c, fmtDate } from './strings'
+import { LanguageSelect } from './ParentConsole'
 import { errorText } from './ParentConsole'
 import type { PageProps } from './FamilyPages'
 
@@ -67,7 +69,7 @@ export function MembersPage({ familyId, role, me }: PageProps) {
       await m.run(async () => {
         await api.post(`/families/${familyId}/invitations`, { email, role: 'parent' })
         await data.reload()
-      }, `Invitation sent to ${email}.`)
+      }, c.invitationSent(email))
     )
       setEmail('')
   }
@@ -84,10 +86,10 @@ export function MembersPage({ familyId, role, me }: PageProps) {
             </span>
             <div className="pp-row-main">
               <div className="pp-row-title">
-                {x.name} {x.userId === me.user.id && <span className="pp-tag">You</span>}
+                {x.name} {x.userId === me.user.id && <span className="pp-tag">{c.you}</span>}
               </div>
               <div className="pp-row-cat">
-                {x.email} · {x.role}
+                {x.email} · {x.role === 'owner' ? c.roleOwner : c.roleParent}
               </div>
             </div>
             {(isOwner || x.userId === me.user.id) && (
@@ -95,7 +97,7 @@ export function MembersPage({ familyId, role, me }: PageProps) {
                 className="pp-btn pp-btn-danger"
                 disabled={m.busy}
                 onClick={() =>
-                  window.confirm(x.userId === me.user.id ? 'Leave this family?' : `Remove ${x.name}?`) &&
+                  window.confirm(x.userId === me.user.id ? c.confirmLeave : c.confirmRemoveMember(x.name)) &&
                   m.run(async () => {
                     await api.del(`/families/${familyId}/members/${x.userId}`)
                     if (x.userId === me.user.id) window.location.reload()
@@ -103,7 +105,7 @@ export function MembersPage({ familyId, role, me }: PageProps) {
                   })
                 }
               >
-                {x.userId === me.user.id ? 'Leave' : 'Remove'}
+                {x.userId === me.user.id ? c.leave : c.remove}
               </button>
             )}
           </li>
@@ -115,20 +117,20 @@ export function MembersPage({ familyId, role, me }: PageProps) {
             </span>
             <div className="pp-row-main">
               <div className="pp-row-title">{i.email}</div>
-              <div className="pp-row-cat">Invited · expires {new Date(i.expiresAt).toLocaleDateString()}</div>
+              <div className="pp-row-cat">{c.invitedExpires(fmtDate(i.expiresAt))}</div>
             </div>
           </li>
         ))}
       </ul>
       {isOwner ? (
         <form className="pc-inline-form" onSubmit={invite}>
-          <input className="pp-input" type="email" placeholder="Invite another parent by email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input className="pp-input" type="email" placeholder={c.invitePh} value={email} onChange={(e) => setEmail(e.target.value)} required />
           <button className="pp-btn pp-btn-primary" disabled={m.busy}>
-            Invite
+            {c.invite}
           </button>
         </form>
       ) : (
-        <p className="pc-muted">Only the family owner can invite parents.</p>
+        <p className="pc-muted">{c.onlyOwnerInvites}</p>
       )}
     </section>
   )
@@ -157,14 +159,14 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
             void m.run(async () => {
               await api.patch(`/families/${familyId}`, { name })
               await reloadMe()
-            }, 'Family renamed.')
+            }, c.familyRenamed)
           }}
         >
-          <h3 className="pp-form-title">Family name</h3>
+          <h3 className="pp-form-title">{c.familyName}</h3>
           <div className="pc-inline-form">
             <input className="pp-input" value={name} onChange={(e) => setName(e.target.value)} required />
             <button className="pp-btn pp-btn-primary" disabled={m.busy}>
-              Save
+              {c.save}
             </button>
           </div>
         </form>
@@ -179,33 +181,31 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
             await api.put(`/families/${familyId}/pin`, { pin: p || null })
             setPinInput('')
             await pin.reload()
-          }, p ? 'Parent PIN set.' : 'Parent PIN removed.')
+          }, p ? c.pinSet : c.pinRemoved)
         }}
       >
-        <h3 className="pp-form-title">Parent PIN</h3>
+        <h3 className="pp-form-title">{c.parentPin}</h3>
         <p className="pc-muted">
-          {pin.data?.set
-            ? 'A PIN is set. Kids’ devices ask for it before opening the parent console.'
-            : 'Set a 4–8 digit PIN so kids’ devices ask for it before opening the parent console.'}
+          {pin.data?.set ? c.pinIsSet : c.pinNotSet}
         </p>
         <div className="pc-inline-form">
           <input
             className="pp-input"
             inputMode="numeric"
             pattern="\d{4,8}|"
-            placeholder={pin.data?.set ? 'New PIN, or blank to remove' : '4–8 digits'}
+            placeholder={pin.data?.set ? c.pinNewPh : c.pinDigitsPh}
             value={pinInput}
             onChange={(e) => setPinInput(e.target.value)}
           />
           <button className="pp-btn pp-btn-primary" disabled={m.busy}>
-            {pinInput.trim() ? 'Save PIN' : pin.data?.set ? 'Remove PIN' : 'Save PIN'}
+            {pinInput.trim() ? c.savePin : pin.data?.set ? c.removePin : c.savePin}
           </button>
         </div>
       </form>
 
       <div className="pp-form">
-        <h3 className="pp-form-title">Theme on this device</h3>
-        <p className="pc-muted">Saved on this device only; other devices keep their own.</p>
+        <h3 className="pp-form-title">{c.themeThisDevice}</h3>
+        <p className="pc-muted">{c.themeDeviceOnly}</p>
         <div className="pc-chip-row">
           {THEMES.map((t) => (
             <button
@@ -218,15 +218,15 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
                 setThemeState(t.id)
               }}
             >
-              {t.emoji} {t.name}
+              {t.emoji} {themeName(t)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="pp-form">
-        <h3 className="pp-form-title">Your data</h3>
-        <p className="pc-muted">Download everything this family stores (videos, categories, kids, devices, parents, change history) as a file.</p>
+        <h3 className="pp-form-title">{c.yourData}</h3>
+        <p className="pc-muted">{c.exportText}</p>
         <div>
           <button
             className="pp-btn pp-btn-ghost"
@@ -234,30 +234,29 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
             onClick={() =>
               void m.run(async () => {
                 const res = await request<Response>('GET', `/api/v1/families/${familyId}/export`, undefined, { raw: true })
-                if (!res.ok) throw new Error(`Export failed (${res.status})`)
+                if (!res.ok) throw new Error(c.exportFailed(res.status))
                 const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'kiddietube-export.json'
                 const url = URL.createObjectURL(await res.blob())
                 const a = Object.assign(document.createElement('a'), { href: url, download: name })
                 a.click()
                 URL.revokeObjectURL(url)
-              }, 'Export downloaded.')
+              }, c.exportDone)
             }
           >
-            Export family data
+            {c.exportButton}
           </button>
         </div>
         {role === 'owner' && (
           <>
             <p className="pc-muted">
-              Deleting the family permanently removes all of the above for every parent, and its devices stop working. Export first if you
-              might want it back.
+              {c.deleteFamilyText}
             </p>
             <div>
               <button
                 className="pp-btn pp-btn-danger"
                 disabled={m.busy}
                 onClick={() => {
-                  const typed = window.prompt(`This can’t be undone. Type the family name (“${family.name}”) to delete it:`)
+                  const typed = window.prompt(c.deleteFamilyPrompt(family.name))
                   if (typed == null) return
                   void m.run(async () => {
                     await api.del(`/families/${familyId}`, { confirmName: typed })
@@ -266,7 +265,7 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
                   })
                 }}
               >
-                Delete family…
+                {c.deleteFamily}
               </button>
             </div>
           </>
@@ -274,43 +273,26 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
       </div>
 
       <div className="pp-form">
-        <h3 className="pp-form-title">Kids’ page language on this device</h3>
-        <div className="pc-chip-row">
-          {(
-            [
-              ['tr', '🇹🇷 Türkçe'],
-              ['en', '🇬🇧 English'],
-            ] as const
-          ).map(([code, label]) => (
-            <button
-              key={code}
-              type="button"
-              className={`pc-chip ${getLang() === code ? 'active' : ''}`}
-              aria-pressed={getLang() === code}
-              onClick={() => {
-                setLang(code)
-                window.location.reload()
-              }}
-            >
-              {label}
-            </button>
-          ))}
+        <h3 className="pp-form-title">{c.languageTitle}</h3>
+        <p className="pc-muted">{c.languageText}</p>
+        <div>
+          <LanguageSelect />
         </div>
       </div>
 
       {pairing && (
         <div className="pp-form">
-          <h3 className="pp-form-title">This device</h3>
-          <p className="pc-muted">Paired as “{pairing.name}”.</p>
+          <h3 className="pp-form-title">{c.thisDevice}</h3>
+          <p className="pc-muted">{c.pairedAs(pairing.name)}</p>
           <button
             className="pp-btn pp-btn-danger"
             onClick={() => {
-              if (!window.confirm('Unpair this device? It will stop showing the list until it’s set up again.')) return
+              if (!window.confirm(c.confirmUnpair)) return
               clearPairing()
               window.location.reload()
             }}
           >
-            Unpair this device
+            {c.unpair}
           </button>
         </div>
       )}
@@ -331,8 +313,8 @@ export function AdminPage() {
 
   return (
     <section className="pc-main">
-      <h3 className="pp-form-title">Invite a new family</h3>
-      <p className="pc-muted">They get an email to create their own, empty family. You won’t be a member of it and can’t see its lists.</p>
+      <h3 className="pp-form-title">{c.inviteFamilyTitle}</h3>
+      <p className="pc-muted">{c.inviteFamilyText}</p>
       {m.error && <div className="pp-error">{m.error}</div>}
       {m.notice && <div className="pp-notice">{m.notice}</div>}
       <form
@@ -343,14 +325,14 @@ export function AdminPage() {
             await m.run(async () => {
               await api.post('/admin/family-invites', { email })
               await invites.reload()
-            }, `Invitation sent to ${email}.`)
+            }, c.invitationSent(email))
           )
             setEmail('')
         }}
       >
-        <input className="pp-input" type="email" placeholder="Parent’s email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input className="pp-input" type="email" placeholder={c.parentEmailPh} value={email} onChange={(e) => setEmail(e.target.value)} required />
         <button className="pp-btn pp-btn-primary" disabled={m.busy}>
-          Send invite
+          {c.sendInvite}
         </button>
       </form>
       <ul className="pp-list">
@@ -360,23 +342,23 @@ export function AdminPage() {
               <div className="pp-row-title">{i.email}</div>
               <div className="pp-row-cat">
                 {i.usedAt
-                  ? `Used ${new Date(i.usedAt).toLocaleDateString()}`
+                  ? c.used(fmtDate(i.usedAt))
                   : new Date(i.expiresAt) < new Date()
-                    ? 'Expired'
-                    : `Pending · expires ${new Date(i.expiresAt).toLocaleDateString()}`}
+                    ? c.expired
+                    : c.pendingExpires(fmtDate(i.expiresAt))}
               </div>
             </div>
           </li>
         ))}
       </ul>
-      <h3 className="pp-form-title">Families on this server</h3>
+      <h3 className="pp-form-title">{c.familiesOnServer}</h3>
       <ul className="pp-list">
         {(families.data ?? []).map((f) => (
           <li key={f.id} className="pp-row">
             <div className="pp-row-main">
               <div className="pp-row-title">{f.name}</div>
               <div className="pp-row-cat">
-                {f.members} parent{f.members === 1 ? '' : 's'} · since {new Date(f.createdAt).toLocaleDateString()}
+                {c.familyStats(f.members, fmtDate(f.createdAt))}
               </div>
             </div>
           </li>

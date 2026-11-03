@@ -1,6 +1,6 @@
 # Kiddie Tube — Roadmap: multi-family, self-hosted
 
-Status: **in progress** — Phases 0–1 done; 2–4 partly (see checklists); go-live waits on DNS + Resend (§8) · Owner: Mehmet · Last updated: 2026-11-03
+Status: **in progress** — Phases 0–1 done; 2–4 partly (see checklists); DNS done; go-live waits on review, then deploy from the branch (§8) · Owner: Mehmet · Last updated: 2026-11-03
 
 This document is the plan for moving Kiddie Tube from a single-family static
 site (GitHub Pages + a GitHub Gist) to a small, self-hosted, multi-family
@@ -62,7 +62,7 @@ PostgreSQL 16, nginx, systemd, Uptime Kuma at `/status`).
 | nginx | new `server` block for `kids.tinyapps.dev`: static web app from `apps/web/dist`, `/api/` proxied to the service |
 | Database | `kiddietube` DB + `kiddietube` DB user (not the shared `crmuser`) |
 | Staging | second instance: `kiddietube-staging.service`, DB `kiddietube_staging`, `kids-staging.tinyapps.dev` |
-| Backups | add `pg_dump -Fc kiddietube` and `/opt/kiddietube/.env` to `/opt/server-configs/backup.sh` |
+| Backups | nightly `/usr/local/bin/backup.sh` (cron 20:00) already dumps every database; add `/opt/kiddietube/.env` to its .env section. The PC task `HomeServerBackupFetch` copies the archive off the server. |
 | Monitoring | Uptime Kuma HTTP check on `https://kids.tinyapps.dev/api/health` |
 | Docs | rows in `/opt/COMMANDS.md`; unit + nginx config committed to `/opt/server-configs` |
 | DNS | `kids` (and `kids-staging`) record in Cloudflare, proxied (orange cloud) |
@@ -75,7 +75,7 @@ PostgreSQL 16, nginx, systemd, Uptime Kuma at `/status`).
   verified.
 - `tinyapps.dev` points at the home IP via dynamic DNS (not a tunnel); keep
   the record proxied so the IP stays hidden.
-- `backup.sh` wasn't in the user crontab; confirm it runs on a schedule.
+- `backup.sh` runs nightly from `/etc/cron.d/server-backup` (as root, 20:00); the PC fetches the archive afterwards.
 
 ---
 
@@ -207,11 +207,11 @@ All input validated with zod schemas from `packages/shared`.
       **our family only**
 - [x] Server setup files: DB + user, `.env`, systemd unit, nginx server block,
       `deploy.sh` with health check + rollback (`deploy/`, prepared, not yet run)
-- [ ] Go live at `kids.tinyapps.dev`; pair our devices (owner: DNS + Resend first)
+- [ ] Go live at `kids.tinyapps.dev`; pair our devices (DNS done; confirm Resend shows tinyapps.dev verified — its DNS records exist)
 
 ### Phase 2 — Hardening
 - [ ] Staging instance (`kids-staging.tinyapps.dev`)
-- [ ] Backups in `backup.sh`; restore tested; Uptime Kuma check
+- [ ] Add Kiddie Tube's `.env` to `backup.sh` (DB already included); restore tested; Uptime Kuma check
 - [x] Security headers / CSP, rate limits, audit log
 - [x] "Update available" prompt; service worker caching review
 - [ ] Player refactor into React components + hooks (no DOM lookups by id);
@@ -224,7 +224,7 @@ All input validated with zod schemas from `packages/shared`.
 - [x] Instance admin: invite families, list families (disable: not yet)
 - [x] Invitations by email (Resend, `noreply@tinyapps.dev`)
 - [x] Parent roles (owner / parent); member management
-- [x] Turkish / English kids' UI (i18n; console still English); categories remain family-defined
+- [x] Turkish / English everywhere, per device: kids' page, parent console, on-device panel, server error messages and emails (sent in the sender's language); categories remain family-defined
 - [x] Family data export + delete
 - [x] Onboarding: 'Get started' checklist for an empty family
 - [ ] Optional starter-pack suggestions (never copied from another family)
@@ -246,8 +246,8 @@ All input validated with zod schemas from `packages/shared`.
 ---
 
 ## 8. Owner to-dos (outside the code)
-- [ ] Cloudflare: add `kids` (and later `kids-staging`) DNS records, proxied
+- [x] Cloudflare: `kids` CNAME → `tinyapps.dev`, proxied (2026-11-03); `kids-staging` later
 - [ ] Resend: verify `tinyapps.dev`, so mail can come from
       `noreply@tinyapps.dev`
-- [ ] Confirm `backup.sh` runs on a schedule
+- [x] Confirm `backup.sh` runs on a schedule (cron 20:00 + PC fetch)
 - [ ] Optional server hardening from §3 "Server notes"

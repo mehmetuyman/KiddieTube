@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { Category, Device, KidProfile, Video } from '@kiddietube/shared'
 import { api } from '../server/api'
 import { navigate } from '../router'
+import { c } from './strings'
 
 interface State {
   categories: number
@@ -40,15 +41,15 @@ export default function GetStarted({ familyId, path }: { familyId: string; path:
   if (!s || (s.videos > 0 && s.kids > 0 && s.devices > 0)) return null
 
   const steps = [
-    { done: s.categories > 0, label: 'Create a few categories (optional)', to: '/parent/categories' },
-    { done: s.videos > 0, label: 'Add videos with YouTube links', to: '/parent/videos' },
-    { done: s.kids > 0, label: 'Add your kids', to: '/parent/profiles' },
-    { done: s.devices > 0, label: 'On each kid’s phone/tablet: sign in, Kids → “Use this device”', to: '/parent/profiles' },
-    { done: s.pin, label: 'Set a parent PIN (optional)', to: '/parent/settings' },
+    { done: s.categories > 0, label: c.stepCategories, to: '/parent/categories' },
+    { done: s.videos > 0, label: c.stepVideos, to: '/parent/videos' },
+    { done: s.kids > 0, label: c.stepKids, to: '/parent/profiles' },
+    { done: s.devices > 0, label: c.stepDevices, to: '/parent/profiles' },
+    { done: s.pin, label: c.stepPin, to: '/parent/settings' },
   ]
   return (
-    <aside className="pc-getstarted" aria-label="Get started">
-      <strong>Get started</strong>
+    <aside className="pc-getstarted" aria-label={c.getStarted}>
+      <strong>{c.getStarted}</strong>
       <ol>
         {steps.map((st) => (
           <li key={st.label} className={st.done ? 'done' : ''}>
