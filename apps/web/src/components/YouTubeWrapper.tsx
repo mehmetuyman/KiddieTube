@@ -79,6 +79,8 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
     const createPlayer = () => {
       if (cancelled || playerRef.current) return
       playerRef.current = new window.YT.Player('videoPlayer', {
+        // privacy-enhanced mode: no YouTube tracking cookies until a video plays
+        host: 'https://www.youtube-nocookie.com',
         width: '100%',
         height: '100%',
         playerVars: YT_PLAYER_VARS,

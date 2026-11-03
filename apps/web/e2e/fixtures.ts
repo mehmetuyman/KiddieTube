@@ -54,7 +54,7 @@ async function isolateNetwork(page: Page) {
         body: JSON.stringify({ title: 'Stubbed title from oEmbed', author_name: 'Stub Channel' }),
       })
     }
-    return route.abort() // thumbnails, fonts, CDN: not needed for behaviour
+    return route.abort() // thumbnails etc.: not needed for behaviour
   })
 }
 

@@ -298,7 +298,7 @@ function KidsPage() {
       <section className="player-section">
         <div className="video-container">
           <div className="video-frame">
-            <div id="videoPlayer" className="w-100 h-100"></div>
+            <div id="videoPlayer"></div>
             <div className="pause-shield" />
             <div className="iframe-guard-full" />
           </div>

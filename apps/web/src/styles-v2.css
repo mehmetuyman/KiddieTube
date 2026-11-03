@@ -52,7 +52,50 @@
   --kt-shield-bg: rgba(165, 150, 150, 0.95);
 }
 
-/* ========== Base & Reset ========== */
+/* ========== Base & Reset ==========
+   The few base rules the app relied on from Bootstrap's reboot (Bootstrap
+   is no longer loaded): body colours/line-height, heading and paragraph
+   spacing, form controls inheriting the font. */
+body {
+  line-height: 1.5;
+  color: #212529;
+}
+
+/* solid colour under the theme gradient (the later \`background\` shorthand
+   on body would otherwise reset it) */
+html body {
+  background-color: #e9ecef;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+button, input, select, textarea {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+button {
+  border-radius: 0;
+  text-transform: none;
+}
+
+img, svg {
+  vertical-align: middle;
+}
+
+/* ===================================== */
 * {
   box-sizing: border-box;
 }
@@ -746,6 +789,10 @@ body:not(.pseudo-fullscreen) .player-section {
 
 .status-badge {
   display: inline-block;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
   padding: 3px 10px;
   border-radius: 12px;
   font-size: 0.7rem;
@@ -1598,3 +1645,10 @@ body.pseudo-fullscreen .app-header {
 body.pseudo-fullscreen .update-banner {
   display: none;
 }
+
+/* Player status colours (were Bootstrap's text-bg-* utilities) */
+.status-badge.text-bg-success { background-color: #198754; color: #fff; }
+.status-badge.text-bg-warning { background-color: #ffc107; color: #000; }
+.status-badge.text-bg-secondary { background-color: #6c757d; color: #fff; }
+.status-badge.text-bg-info { background-color: #0dcaf0; color: #000; }
+.status-badge.text-bg-primary { background-color: #0d6efd; color: #fff; }
