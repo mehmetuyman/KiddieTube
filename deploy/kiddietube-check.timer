@@ -1,0 +1,12 @@
+# /etc/systemd/system/kiddietube-check.timer
+[Unit]
+Description=Run the Kiddie Tube video availability check nightly
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=20min
+# if the laptop was off/unplugged at 03:30, run once when it's back
+Persistent=true
+
+[Install]
+WantedBy=timers.target

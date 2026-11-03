@@ -1,0 +1,16 @@
+# /etc/systemd/system/kiddietube-check.service
+# Nightly video availability check (started by kiddietube-check.timer).
+[Unit]
+Description=Kiddie Tube video availability check
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/kiddietube/apps/api
+EnvironmentFile=/opt/kiddietube/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node --import tsx src/scripts/check-videos.ts
+NoNewPrivileges=true
+PrivateTmp=true

@@ -316,3 +316,41 @@ describe('family export and deletion', () => {
     expect((await owner.req('GET', '/api/v1/me')).body.families.some((f: { id: string }) => f.id === fam)).toBe(false)
   })
 })
+
+describe('nightly availability check', () => {
+  it('marks gone videos unavailable (hidden from the feed), restores them when back, and ignores network errors', async () => {
+    const { checkAllVideos } = await import('../scripts/check-videos.ts')
+    const c = new Client(h)
+    await c.signIn(ADMIN_EMAIL)
+    const fam = (await c.req('POST', '/api/v1/families', { name: 'Check Family' })).body.id
+    await c.req('POST', `/api/v1/families/${fam}/videos`, { url: 'lllllllllll' })
+    await c.req('POST', `/api/v1/families/${fam}/videos`, { url: 'mmmmmmmmmmm' })
+    const kid = await c.req('POST', `/api/v1/families/${fam}/profiles`, { name: 'K' })
+    const key = (await c.req('POST', `/api/v1/families/${fam}/devices`, { kidProfileId: kid.body.id, name: 'D' })).body.deviceKey
+    const feedIds = async () =>
+      (await new Client(h).req('GET', '/api/v1/feed', undefined, { authorization: `Device ${key}` })).body.videos.map((v: { youtubeId: string }) => v.youtubeId)
+
+    let gone = new Set(['lllllllllll'])
+    let netDown = false
+    const fakeFetch = async (url: string) => {
+      if (netDown) throw new Error('offline')
+      const id = /v%3D([A-Za-z0-9_-]{11})/.exec(url)![1]
+      return new Response('{}', { status: gone.has(id) ? 404 : 200 })
+    }
+
+    await checkAllVideos(h.db.db, { fetchImpl: fakeFetch as never })
+    expect(await feedIds()).toEqual(['mmmmmmmmmmm'])
+    const list = await c.req('GET', `/api/v1/families/${fam}/videos`)
+    expect(list.body.find((v: { youtubeId: string }) => v.youtubeId === 'lllllllllll').status).toBe('unavailable')
+
+    netDown = true // a network outage must not change anything
+    const r = await checkAllVideos(h.db.db, { fetchImpl: fakeFetch as never })
+    expect(r.nowUnavailable + r.restored).toBe(0)
+    expect(await feedIds()).toEqual(['mmmmmmmmmmm'])
+
+    netDown = false
+    gone = new Set()
+    await checkAllVideos(h.db.db, { fetchImpl: fakeFetch as never })
+    expect((await feedIds()).sort()).toEqual(['lllllllllll', 'mmmmmmmmmmm'])
+  })
+})

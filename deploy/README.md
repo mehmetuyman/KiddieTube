@@ -14,6 +14,7 @@ done once by hand, then `deploy.sh` handles updates.
 | nginx | `/etc/nginx/sites-available/kiddietube` + `snippets/kiddietube-headers.conf` |
 | Database | `kiddietube` DB, owned by the ordinary `kiddietube` user |
 | Deploy log | `/var/log/kiddietube-deploy.log` |
+| Nightly video check | `kiddietube-check.timer` → `journalctl -u kiddietube-check` |
 | Pre-deploy DB backups | `/var/backups/kiddietube/` (last 5) |
 
 ## Before you start (owner)
@@ -44,6 +45,11 @@ nano /opt/kiddietube/.env      # DATABASE_URL, AUTH_SECRET (openssl rand -base64
 sudo cp /opt/kiddietube/deploy/kiddietube.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable kiddietube
+
+# 4b. Nightly video availability check (03:30; catches up after the laptop was off)
+sudo cp /opt/kiddietube/deploy/kiddietube-check.service /opt/kiddietube/deploy/kiddietube-check.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now kiddietube-check.timer
 
 # 5. nginx
 sudo cp /opt/kiddietube/deploy/nginx/kiddietube-headers.conf /etc/nginx/snippets/

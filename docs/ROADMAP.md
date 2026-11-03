@@ -233,7 +233,8 @@ All input validated with zod schemas from `packages/shared`.
 - [x] Separate lists per kid profile (category restriction per profile)
 - [ ] Screen-time limits and bedtime lock
 - [ ] Parent-only watch history (opt-in)
-- [ ] Playlist import; nightly check for deleted/private videos
+- [x] Nightly check for deleted/private videos (`kiddietube-check.timer`)
+- [ ] Playlist import (needs a YouTube Data API key)
 - [ ] Play-through a category; cover YouTube end-screen suggestions
 - [ ] Web Push for "new videos" / "update available"
 - [ ] Self-hosted GitHub Actions runner → auto-deploy staging on merge
