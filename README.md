@@ -13,8 +13,9 @@ apps/web/          the web app (PWA)
   src/             app code (+ *.test.ts unit tests next to the code)
   e2e/             Playwright end-to-end tests (YouTube stubbed)
   public/          static files, incl. videos.json (bundled seed list)
-apps/api/          (Phase 1) server API
-packages/shared/   (Phase 1) types + validation shared by web and API
+apps/api/          server API (Fastify, Drizzle, Better Auth)
+packages/shared/   types + validation shared by web and API
+deploy/            home-server deployment (systemd, nginx, deploy.sh)
 docs/              roadmap, ADRs
 ```
 
@@ -36,6 +37,28 @@ npm run preview      # serve the production build
 ```
 
 First e2e run on a machine: `npx -w @kiddietube/web playwright install chromium webkit`.
+
+### Server mode (multi-family, self-hosted)
+
+The self-hosted version (`kids.tinyapps.dev`) is the same web app built with
+`VITE_SERVER_MODE=true`, talking to the API in `apps/api`. Run both locally
+(the API uses an embedded PostgreSQL, PGlite, so nothing to install):
+
+```bash
+ADMIN_EMAILS=you@example.com FAKE_YOUTUBE_META=true npm run dev -w @kiddietube/api   # :3007, data in apps/api/.data/dev
+VITE_SERVER_MODE=true BASE_PATH=/ npm run dev -w @kiddietube/web                    # proxies /api to :3007
+```
+
+Open `/join` to create the first (admin) account, create a family, add
+categories/videos, then **Kids → Use this device**. Without
+`RESEND_API_KEY`, emails (invites, password resets) are printed to the API log.
+
+```bash
+npm test -w @kiddietube/api       # API integration tests (PGlite, RLS enforced)
+npm run test:e2e:server           # real API + server-mode build, end to end
+```
+
+Deployment to the home server: [deploy/README.md](deploy/README.md).
 
 **Base path:** the build defaults to `/KiddieTube/` (GitHub Pages). For hosting
 at a domain root, build with `BASE_PATH=/` (e.g. `BASE_PATH=/ npm run build`).

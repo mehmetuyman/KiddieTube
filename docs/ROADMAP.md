@@ -1,6 +1,6 @@
 # Kiddie Tube — Roadmap: multi-family, self-hosted
 
-Status: **planned** · Owner: Mehmet · Last updated: 2026-11-03
+Status: **in progress** (Phase 0–1 done, see checklists) · Owner: Mehmet · Last updated: 2026-11-03
 
 This document is the plan for moving Kiddie Tube from a single-family static
 site (GitHub Pages + a GitHub Gist) to a small, self-hosted, multi-family
@@ -40,7 +40,7 @@ After that it's retired, and the repo can be made private.
 | Name | Kiddie Tube | Kept. Note: YouTube's API/branding terms discourage names confusable with YouTube; low risk for private use, revisit before any wider release. Name lives in config/manifest. |
 | Frontend | Vite + React + TypeScript, installable PWA | Offline-first app that must run without its server; a single-page app is the right fit (not Next.js). |
 | API | Fastify + TypeScript (Node 20) | Small memory footprint (~60–80 MB) on a 2-core / 3.7 GB box already running three Next.js apps. |
-| Database | PostgreSQL 16 (existing), Prisma ORM | Already on the server; Prisma is what EmlakPro uses. Own DB + own DB user. |
+| Database | PostgreSQL 16 (existing), Drizzle ORM; PGlite for dev/tests | Already on the server; Drizzle for first-class PGlite + SQL-first RLS (ADR-0002, replaces Prisma). Own DB + own DB user. |
 | Auth | Better Auth (email + password, email codes / magic link, passkeys; organization plugin) | Framework-agnostic, works with Fastify + Prisma; organizations map to families + roles + invitations. |
 | Tenancy | One shared database, every row scoped by `familyId`, enforced in the API **and** by PostgreSQL row-level security | A few families with small lists; far simpler than database-per-tenant (EmlakPro's choice, which suits it). |
 | Hosting | systemd service + nginx, **no Docker** | Matches every other app on the server. |
@@ -193,27 +193,27 @@ All input validated with zod schemas from `packages/shared`.
 - [x] This roadmap + ADR-0001 (stack decisions)
 
 ### Phase 1 — Server MVP (on a branch; current site stays live)
-- [ ] `apps/api`: Fastify, config, logging, health endpoint, error handling
-- [ ] Prisma schema + migrations (§4.2); row-level security policies
-- [ ] Better Auth: parent sign-in (email + password, email code), sessions
-- [ ] Families, memberships, kid profiles, device pairing + device keys
-- [ ] Categories and videos CRUD; YouTube metadata via oEmbed (server-side)
-- [ ] `packages/shared`: zod schemas + types used by web and API
-- [ ] Web: kid mode reads the device's local store; background sync with
+- [x] `apps/api`: Fastify, config, logging, health endpoint, error handling
+- [x] Database schema + migrations (§4.2) — Drizzle + PGlite, see ADR-0002; row-level security policies
+- [x] Better Auth: parent sign-in (email + password, reset by email), sessions
+- [x] Families, memberships, kid profiles, device pairing + device keys
+- [x] Categories and videos CRUD; YouTube metadata via oEmbed (server-side)
+- [x] `packages/shared`: zod schemas + types used by web and API
+- [x] Web: kid mode reads the device's local store; background sync with
       the API; "server offline" handling
-- [ ] Web: parent console as real pages (videos, categories, profiles,
+- [x] Web: parent console as real pages (videos, categories, profiles,
       devices) replacing the pop-up panel
-- [ ] One-time import of the current family's list (from the Gist) into
+- [x] One-time import of the current family's list (from the Gist) into
       **our family only**
-- [ ] Server setup: DB + user, `.env`, systemd unit, nginx server block,
-      `deploy.sh` with health check + rollback
-- [ ] Go live at `kids.tinyapps.dev`; pair our devices
+- [x] Server setup files: DB + user, `.env`, systemd unit, nginx server block,
+      `deploy.sh` with health check + rollback (`deploy/`, prepared, not yet run)
+- [ ] Go live at `kids.tinyapps.dev`; pair our devices (owner: DNS + Resend first)
 
 ### Phase 2 — Hardening
 - [ ] Staging instance (`kids-staging.tinyapps.dev`)
 - [ ] Backups in `backup.sh`; restore tested; Uptime Kuma check
-- [ ] Security headers / CSP, rate limits, audit log
-- [ ] "Update available" prompt; service worker caching review
+- [x] Security headers / CSP, rate limits, audit log
+- [x] "Update available" prompt; service worker caching review
 - [ ] Player refactor into React components + hooks (no DOM lookups by id);
       component tests
 - [ ] Stylesheet split per component (keep theme tokens); bundle fonts;
