@@ -161,3 +161,17 @@ test.describe('fullscreen on phones without the Fullscreen API (iPhone)', () => 
     expect(await page.evaluate(() => scrollY)).toBe(lockedAt) // back where we were
   })
 })
+
+test.describe('Turkish device', () => {
+  test.use({ locale: 'tr-TR' })
+
+  test('kids page speaks Turkish', async ({ page }) => {
+    await openApp(page)
+    await expect(page.locator('.grid-title')).toHaveText('Tüm Videolar')
+    await expect(page.locator('.grid-count')).toHaveText('65 video')
+    await expect(page.locator('.category-pill.active .category-name')).toHaveText('Tümü')
+    await page.locator('.video-card').nth(1).click()
+    await expect(page.locator('#videoStatus')).toHaveText('Oynatılıyor')
+    await expect(page.locator('html')).toHaveAttribute('lang', 'tr')
+  })
+})

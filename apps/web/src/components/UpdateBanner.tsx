@@ -3,6 +3,7 @@
 // reloads. Also re-checks for updates hourly and whenever the app is reopened.
 import { useEffect, useState } from 'react'
 import { registerSW } from 'virtual:pwa-register'
+import { t } from '../lib/i18n'
 
 export default function UpdateBanner() {
   const [update, setUpdate] = useState<null | (() => void)>(null)
@@ -29,9 +30,9 @@ export default function UpdateBanner() {
   if (!update) return null
   return (
     <div className="update-banner" role="status">
-      <span>✨ A new version of Kiddie Tube is ready.</span>
+      <span>✨ {t.updateReady}</span>
       <button className="update-banner-btn" onClick={update}>
-        Update
+        {t.update}
       </button>
     </div>
   )

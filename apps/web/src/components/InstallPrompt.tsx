@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { t } from '../lib/i18n';
 
 const INSTALL_PROMPT_PREF_KEY = 'kiddietube-install-prompt';
 const PROMPT_DISMISSED_VALUE = 'dismissed';
@@ -97,17 +98,17 @@ const InstallPrompt: React.FC<InstallPromptProps> = ({ onClose }) => {
           alt="KiddieTube Logo"
           className="install-prompt-logo"
         />
-        <h2>Install KiddieTube</h2>
-        <p>Install our app for the best fullscreen experience!</p>
+        <h2>{t.installTitle}</h2>
+        <p>{t.installText}</p>
         <div className="install-prompt-buttons">
           <button onClick={handleInstall} className="install-button">
-            Install
+            {t.install}
           </button>
           <button 
             className="close-button" 
             onClick={handleDismiss}
           >
-            Maybe Later
+            {t.maybeLater}
           </button>
         </div>
       </div>

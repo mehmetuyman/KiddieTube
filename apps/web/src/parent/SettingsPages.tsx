@@ -4,6 +4,7 @@ import type { Family } from '@kiddietube/shared'
 import { api, request } from '../server/api'
 import { clearPairing, getPairing } from '../server/device'
 import { THEMES, getTheme, setTheme, type ThemeId } from '../lib/theme'
+import { getLang, setLang } from '../lib/i18n'
 import { errorText } from './ParentConsole'
 import type { PageProps } from './FamilyPages'
 
@@ -270,6 +271,31 @@ export function SettingsPage({ familyId, role, family, reloadMe }: PageProps & {
             </div>
           </>
         )}
+      </div>
+
+      <div className="pp-form">
+        <h3 className="pp-form-title">Kids’ page language on this device</h3>
+        <div className="pc-chip-row">
+          {(
+            [
+              ['tr', '🇹🇷 Türkçe'],
+              ['en', '🇬🇧 English'],
+            ] as const
+          ).map(([code, label]) => (
+            <button
+              key={code}
+              type="button"
+              className={`pc-chip ${getLang() === code ? 'active' : ''}`}
+              aria-pressed={getLang() === code}
+              onClick={() => {
+                setLang(code)
+                window.location.reload()
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {pairing && (

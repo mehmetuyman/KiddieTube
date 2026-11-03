@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { t } from '../lib/i18n'
 
 const YT_PLAYER_VARS = {
   rel: 0,
@@ -621,7 +622,7 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
     if (event.data === 2) {
       pauseShield?.classList.add('visible')
       if (statusEl) {
-        statusEl.textContent = 'Paused'
+        statusEl.textContent = t.status.paused
         statusEl.className = 'status-badge badge text-bg-warning'
       }
       if (btnPlayPause) btnPlayPause.textContent = '▶'
@@ -630,20 +631,20 @@ export default function YouTubeWrapper({ videoId, autoPlay = false, playRequest 
       if (btnPlayPause && event.data === 1) btnPlayPause.textContent = '⏸'
       if (statusEl) {
         if (event.data === 1) {
-          statusEl.textContent = 'Playing'
+          statusEl.textContent = t.status.playing
           statusEl.className = 'status-badge badge text-bg-success'
         } else if (event.data === 0) {
-          statusEl.textContent = 'Ended'
+          statusEl.textContent = t.status.ended
           statusEl.className = 'status-badge badge text-bg-secondary'
           if (btnPlayPause) btnPlayPause.textContent = '▶'
         } else if (event.data === 3) {
-          statusEl.textContent = 'Buffering'
+          statusEl.textContent = t.status.buffering
           statusEl.className = 'status-badge badge text-bg-info'
         } else if (event.data === 5) {
-          statusEl.textContent = 'Ready'
+          statusEl.textContent = t.status.ready
           statusEl.className = 'status-badge badge text-bg-primary'
         } else {
-          statusEl.textContent = 'Idle'
+          statusEl.textContent = t.status.idle
           statusEl.className = 'status-badge badge text-bg-secondary'
         }
       }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Video } from '../lib/videoStore'
+import { t } from '../lib/i18n'
 
 type Props = {
   videos: Video[]
@@ -46,7 +47,7 @@ export default function VideoGrid({ videos, activeVideoId, onSelect }: Props) {
             {video.id === activeVideoId && (
               <div className="playing-indicator">
                 <span className="playing-pulse"></span>
-                ▶ Playing
+                ▶ {t.playing}
               </div>
             )}
           </div>

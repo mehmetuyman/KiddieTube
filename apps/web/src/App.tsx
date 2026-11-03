@@ -7,6 +7,7 @@ import { Video, loadVideos, LoadSource, sortNewestFirst, visibleVideos } from '.
 import { useDragScroll } from './lib/useDragScroll'
 import { useCompactOnScroll } from './lib/useCompactOnScroll'
 import { applyTheme, hasSavedTheme } from './lib/theme'
+import { htmlLang, t } from './lib/i18n'
 import type { Category, Feed } from '@kiddietube/shared'
 import { SERVER_MODE } from './server/mode'
 import { getPairing, startFeedSync, verifyPinWithDevice } from './server/device'
@@ -38,7 +39,8 @@ function feedToVideos(feed: Feed): Video[] {
     addedAt: v.createdAt,
   }))
 }
-const OTHER_CATEGORY = 'Diğer / Other'
+const OTHER_CATEGORY = t.otherCategory
+document.documentElement.lang = htmlLang()
 
 // Loaded only when a parent opens the console: keeps the kids' bundle small.
 const ParentConsole = lazy(() => import('./parent/ParentConsole'))
@@ -165,7 +167,7 @@ function KidsPage() {
   const getCategoryLabel = (cat: string) => {
     const emoji = serverCategories?.find((c) => c.name === cat)?.emoji ?? CATEGORY_EMOJIS[cat] ?? '📺'
     // Show only emoji on mobile, emoji + short text on desktop
-    const shortName = cat.split(' / ')[0] // Get Turkish part only
+    const shortName = cat === 'All' ? t.all : cat.split(' / ')[0] // Turkish part of legacy names
     return { emoji, shortName }
   }
 
@@ -203,9 +205,9 @@ function KidsPage() {
     if (!getPairing()) return navigate('/parent')
     try {
       if (!(await verifyPinWithDevice(''))) {
-        const pin = window.prompt('Parent PIN')
+        const pin = window.prompt(t.parentPin)
         if (pin == null) return
-        if (!(await verifyPinWithDevice(pin))) return void window.alert('Wrong PIN')
+        if (!(await verifyPinWithDevice(pin))) return void window.alert(t.wrongPin)
       }
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 429) return void window.alert(e.message)
@@ -257,8 +259,8 @@ function KidsPage() {
             tabIndex={0}
             onContextMenu={(e) => e.preventDefault()}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.location.reload() }}
-            aria-label="Reload app"
-            title="Reload app"
+            aria-label={t.reloadApp}
+            title={t.reloadApp}
           >
             <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Kiddie Tube" className="app-logo" draggable={false} />
             <span className="brand-title">Kiddie Tube</span>
@@ -304,30 +306,30 @@ function KidsPage() {
           </div>
 
           {/* Minimize button - positioned at top-right in fullscreen */}
-          <button id="btnExitPseudoFs" className="control-btn-topright exit-fullscreen" aria-label="Exit fullscreen">⛶</button>
+          <button id="btnExitPseudoFs" className="control-btn-topright exit-fullscreen" aria-label={t.exitFullscreen}>⛶</button>
 
           <div className="custom-controls">
             {/* Bottom center: Play/Pause, skip buttons, timeline, and fullscreen button */}
             <div className="controls-bottom">
-              <button id="btnSkipBack" className="control-btn-skip" title="Back 10s">
+              <button id="btnSkipBack" className="control-btn-skip" title={t.back10} aria-label={t.back10}>
                 <span className="skip-icon">↶<sub>10</sub></span>
               </button>
               <button id="btnPlayPause" className="control-btn-play">▶</button>
-              <button id="btnSkipForward" className="control-btn-skip" title="Forward 10s">
+              <button id="btnSkipForward" className="control-btn-skip" title={t.forward10} aria-label={t.forward10}>
                 <span className="skip-icon">↷<sub>10</sub></span>
               </button>
               <span id="currentTime" className="time-display">0:00</span>
               <input type="range" id="progressBar" className="progress-slider" defaultValue={0} min={0} max={100} />
               <span id="duration" className="time-display">0:00</span>
-              <button id="btnSpeed" className="control-btn-speed" title="Playback speed" aria-label="Playback speed">1x</button>
-              <button id="btnFullscreen" className="control-btn-fullscreen">⛶</button>
+              <button id="btnSpeed" className="control-btn-speed" title={t.playbackSpeed} aria-label={t.playbackSpeed}>1x</button>
+              <button id="btnFullscreen" className="control-btn-fullscreen" title={t.fullscreen} aria-label={t.fullscreen}>⛶</button>
             </div>
           </div>
 
-          <h1 className="video-title" id="videoTitle">{activeVideo ? activeVideo.title : 'Select a video to begin'}</h1>
+          <h1 className="video-title" id="videoTitle">{activeVideo ? activeVideo.title : t.selectVideo}</h1>
           <div className="video-meta">
             <p className="video-category" id="videoCategory">{activeVideo?.category ?? ''}</p>
-            <span className="status-badge" id="videoStatus">Idle</span>
+            <span className="status-badge" id="videoStatus">{t.status.idle}</span>
           </div>
         </div>
       </section>
@@ -335,8 +337,8 @@ function KidsPage() {
       {/* Video grid */}
       <section className="video-grid-section" ref={gridRef}>
         <div className="grid-header">
-          <span className="grid-title">{activeCategory === 'All' ? 'All Videos' : getCategoryLabel(activeCategory).shortName}</span>
-          <span className="grid-count">{filtered.length} videos</span>
+          <span className="grid-title">{activeCategory === 'All' ? t.allVideos : getCategoryLabel(activeCategory).shortName}</span>
+          <span className="grid-count">{t.videosCount(filtered.length)}</span>
         </div>
         <VideoGrid
           videos={filtered}
@@ -366,9 +368,9 @@ function SetUpDevice() {
       <div className="pc-card pc-welcome">
         <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="" className="pc-welcome-logo" />
         <h1>Kiddie Tube</h1>
-        <p>This device isn’t set up yet. A parent can set it up in a minute.</p>
+        <p>{t.setupText}</p>
         <button className="pp-btn pp-btn-primary" onClick={() => navigate('/parent/profiles')}>
-          Set up this device (parents)
+          {t.setupButton}
         </button>
       </div>
     </div>
