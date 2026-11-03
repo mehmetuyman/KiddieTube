@@ -12,7 +12,8 @@
     "preview": "npm run preview -w @kiddietube/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e -w @kiddietube/web"
   },
   "engines": {
     "node": ">=20.19"
