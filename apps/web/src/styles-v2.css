@@ -882,8 +882,8 @@ body:not(.pseudo-fullscreen) .player-section {
 .pause-shield {
   position: absolute;
   inset: 0;
-  /* Absolute path includes the Vite `base` (/KiddieTube/) so it resolves on GitHub Pages */
-  background: var(--kt-shield-bg) url('/KiddieTube/assets/logo_no_bg.png') center/250px no-repeat;
+  /* public/ file; Vite prefixes the configured base path at build time */
+  background: var(--kt-shield-bg) url('/assets/logo_no_bg.png') center/250px no-repeat;
   z-index: 9998;
   display: none;
   opacity: 0;

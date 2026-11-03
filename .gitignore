@@ -14,8 +14,8 @@ logs/
 Thumbs.db
 
 # Build
-/dist/
-/build/
+dist/
+build/
 
 # VS Code
 .vscode/
@@ -40,3 +40,7 @@ public/assets/cache/
 backup-static/
 .env.local
 .env.*.local
+# Test artifacts
+test-results/
+playwright-report/
+blob-report/

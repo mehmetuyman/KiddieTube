@@ -1,26 +1,16 @@
 {
-  "name": "kiddietube-react",
-  "version": "2.2.1",
+  "name": "kiddietube",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "start": "vite",
-    "dev": "vite",
-    "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.0.28",
-    "@types/react-dom": "^18.0.11",
-    "@vitejs/plugin-react": "^4.0.0",
-    "typescript": "^5.1.6",
-    "vite": "^7.1.9",
-    "vite-plugin-pwa": "^1.0.3"
+    "dev": "npm run dev -w @kiddietube/web",
+    "build": "npm run build -w @kiddietube/web",
+    "preview": "npm run preview -w @kiddietube/web",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
     "node": ">=20.19"

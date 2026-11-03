@@ -5,10 +5,18 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'))
 
+// URL path the app is served from. GitHub Pages serves it from
+// https://<user>.github.io/KiddieTube/ (the default); the self-hosted site at
+// https://kids.tinyapps.dev/ builds with BASE_PATH=/
+const base = normalizeBase(process.env.BASE_PATH ?? '/KiddieTube/')
+
+function normalizeBase(p: string): string {
+  const trimmed = p.trim().replace(/^\/+|\/+$/g, '')
+  return trimmed ? `/${trimmed}/` : '/'
+}
+
 export default defineConfig({
-  // GitHub Pages serves the site from https://<user>.github.io/<repo>/
-  // set base to the repo name so asset URLs resolve correctly
-  base: '/KiddieTube/',
+  base,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
