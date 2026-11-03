@@ -160,4 +160,4 @@ export const apiError = z.object({
 })
 export type ApiError = z.infer<typeof apiError>
 
-export const API_PREFIX = '/api/v1'
+export { API_PREFIX } from './constants'

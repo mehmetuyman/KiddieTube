@@ -113,3 +113,12 @@ export function setTheme(id: ThemeId): void {
   }
   applyTheme(id)
 }
+
+/** Has this device picked a theme itself (vs. using a default)? */
+export function hasSavedTheme(): boolean {
+  try {
+    return isThemeId(localStorage.getItem(LS_THEME))
+  } catch {
+    return false
+  }
+}

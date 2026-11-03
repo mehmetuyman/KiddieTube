@@ -1564,3 +1564,37 @@ body.pseudo-fullscreen .app-header {
     opacity: 1;
   }
 }
+
+/* ========== Update banner ========== */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 2147483645; /* below the parent panel and fullscreen video */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 32px);
+  padding: 10px 12px 10px 16px;
+  border-radius: 14px;
+  background: #1f2937;
+  color: #fff;
+  font-size: 0.9rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.update-banner-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  background: var(--kt-accent);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+body.pseudo-fullscreen .update-banner {
+  display: none;
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import VideoGrid from './components/VideoGrid'
 import YouTubeWrapper from './components/YouTubeWrapper'
 import InstallPrompt from './components/InstallPrompt'
@@ -6,6 +6,13 @@ import ParentPanel, { requestParentAccess } from './components/ParentPanel'
 import { Video, loadVideos, LoadSource, sortNewestFirst, visibleVideos } from './lib/videoStore'
 import { useDragScroll } from './lib/useDragScroll'
 import { useCompactOnScroll } from './lib/useCompactOnScroll'
+import { applyTheme, hasSavedTheme } from './lib/theme'
+import type { Category, Feed } from '@kiddietube/shared'
+import { SERVER_MODE } from './server/mode'
+import { getPairing, startFeedSync, verifyPinWithDevice } from './server/device'
+import { ApiRequestError } from './server/api'
+import { navigate, usePath } from './router'
+import UpdateBanner from './components/UpdateBanner'
 
 // Category emoji mapping
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -20,8 +27,43 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   'Sağlık ve Günlük Bilgiler / Health & Everyday Tips': '💊'
 }
 
+/** Server mode: a device's feed as the kids' page's video list. */
+function feedToVideos(feed: Feed): Video[] {
+  const name = new Map(feed.categories.map((c) => [c.id, c.name]))
+  return feed.videos.map((v) => ({
+    id: v.youtubeId,
+    title: v.title,
+    category: (v.categoryId && name.get(v.categoryId)) || OTHER_CATEGORY,
+    channel: v.channel ?? undefined,
+    addedAt: v.createdAt,
+  }))
+}
+const OTHER_CATEGORY = 'Diğer / Other'
+
+// Loaded only when a parent opens the console: keeps the kids' bundle small.
+const ParentConsole = lazy(() => import('./parent/ParentConsole'))
+
 export default function App() {
+  const path = usePath()
+  return (
+    <>
+      {SERVER_MODE && path !== '/' ? (
+        <Suspense fallback={null}>
+          <ParentConsole />
+        </Suspense>
+      ) : (
+        <KidsPage />
+      )}
+      <UpdateBanner />
+    </>
+  )
+}
+
+function KidsPage() {
   const [videos, setVideos] = useState<Video[]>([])
+  // server mode: the family's categories (order + emoji) and pairing state
+  const [serverCategories, setServerCategories] = useState<Category[] | null>(null)
+  const [paired, setPaired] = useState(() => !SERVER_MODE || !!getPairing())
   const [activeCategory, setActiveCategory] = useState('All')
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
@@ -76,6 +118,17 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (SERVER_MODE) {
+      // offline-first: stored feed now, server check in the background
+      return startFeedSync(
+        (feed) => {
+          setServerCategories(feed.categories)
+          applyList(feedToVideos(feed))
+          if (!hasSavedTheme() && feed.profile.defaultTheme) applyTheme(feed.profile.defaultTheme)
+        },
+        () => setPaired(false),
+      )
+    }
     loadVideos()
       .then(({ doc }) => applyList(doc.videos))
       .catch(err => console.error('Failed to load videos', err))
@@ -98,12 +151,19 @@ export default function App() {
   // `videos` is the full list (the parent panel manages hidden ones too);
   // everything on the kids' page uses only the visible ones
   const shownVideos = visibleVideos(videos)
-  const categories = ['All', ...Array.from(new Set(shownVideos.map((v: Video) => v.category)))]
+  const present = Array.from(new Set(shownVideos.map((v: Video) => v.category)))
+  const categories = [
+    'All',
+    ...(serverCategories
+      ? // family's own order; only categories that have videos, then "Other"
+        [...serverCategories.map((c) => c.name).filter((n) => present.includes(n)), ...present.filter((n) => !serverCategories.some((c) => c.name === n))]
+      : present),
+  ]
   const filtered = activeCategory === 'All' ? shownVideos : shownVideos.filter((v: Video) => v.category === activeCategory)
   const activeVideo = shownVideos.find(v => v.id === activeVideoId) ?? null
 
   const getCategoryLabel = (cat: string) => {
-    const emoji = CATEGORY_EMOJIS[cat] || '📺'
+    const emoji = serverCategories?.find((c) => c.name === cat)?.emoji ?? CATEGORY_EMOJIS[cat] ?? '📺'
     // Show only emoji on mobile, emoji + short text on desktop
     const shortName = cat.split(' / ')[0] // Get Turkish part only
     return { emoji, shortName }
@@ -131,10 +191,27 @@ export default function App() {
 
   function openParent() {
     clearSelection()
-    if (!requestParentAccess()) return
-    setParentOpen(true)
     // the OS may extend the selection until the finger lifts
     window.setTimeout(clearSelection, 50)
+    if (SERVER_MODE) return void openParentConsole()
+    if (!requestParentAccess()) return
+    setParentOpen(true)
+  }
+
+  /** Server mode: PIN-gate the parent console on a paired device. */
+  async function openParentConsole() {
+    if (!getPairing()) return navigate('/parent')
+    try {
+      if (!(await verifyPinWithDevice(''))) {
+        const pin = window.prompt('Parent PIN')
+        if (pin == null) return
+        if (!(await verifyPinWithDevice(pin))) return void window.alert('Wrong PIN')
+      }
+    } catch (e) {
+      if (e instanceof ApiRequestError && e.status === 429) return void window.alert(e.message)
+      // offline: the console itself explains that changes are paused
+    }
+    navigate('/parent')
   }
 
   // --- long-press on the logo ---
@@ -160,6 +237,8 @@ export default function App() {
     }
     window.location.reload()
   }
+
+  if (!paired) return <SetUpDevice />
 
   return (
     <div className="app-container">
@@ -269,13 +348,29 @@ export default function App() {
       <InstallPrompt onClose={() => {}} />
       <YouTubeWrapper videoId={activeVideoId} autoPlay={shouldAutoPlay} playRequest={playRequest} />
 
-      <ParentPanel
+      {!SERVER_MODE && <ParentPanel
         open={parentOpen}
         onClose={() => setParentOpen(false)}
         videos={videos}
         onVideosChange={applyList}
         onRefresh={reloadFromCloud}
-      />
+      />}
+    </div>
+  )
+}
+
+/** Server mode, device not paired (new, or revoked by a parent). */
+function SetUpDevice() {
+  return (
+    <div className="pc-page">
+      <div className="pc-card pc-welcome">
+        <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="" className="pc-welcome-logo" />
+        <h1>Kiddie Tube</h1>
+        <p>This device isn’t set up yet. A parent can set it up in a minute.</p>
+        <button className="pp-btn pp-btn-primary" onClick={() => navigate('/parent/profiles')}>
+          Set up this device (parents)
+        </button>
+      </div>
     </div>
   )
 }

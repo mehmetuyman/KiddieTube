@@ -17,13 +17,19 @@ function normalizeBase(p: string): string {
 
 export default defineConfig({
   base,
+  server: {
+    // server mode in development: `npm run dev -w @kiddietube/api` on :3007
+    proxy: { '/api': 'http://127.0.0.1:3007' },
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // New versions wait for the user: the app shows "New version - tap to
+      // update" (components/UpdateBanner.tsx) instead of swapping silently.
+      registerType: 'prompt',
       includeAssets: ['icons/*.png', 'assets/*.png'],
       // Single source of truth for the web app manifest. Paths are relative so
       // they resolve under the /KiddieTube/ base on GitHub Pages.
@@ -42,6 +48,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // The app is a single page: unknown paths (/parent, /join, ...) get
+        // index.html from the cache - but never API calls.
+        navigateFallbackDenylist: [/\/api\//],
         // The seed list isn't precached (it must pick up new deploys), but keep
         // the last copy so an installed app still has videos when offline.
         runtimeCaching: [
