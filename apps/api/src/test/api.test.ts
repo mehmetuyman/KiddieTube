@@ -257,3 +257,15 @@ describe('members', () => {
     expect(members.body.members.map((m: { role: string }) => m.role).sort()).toEqual(['owner', 'parent'])
   })
 })
+
+describe('legacy list import format', () => {
+  it('accepts the bundled videos.json and the gist document format, dropping invalid entries', async () => {
+    const { parseLegacyList, LEGACY_EMOJI } = await import('../scripts/import-list.ts')
+    const { readFileSync } = await import('node:fs')
+    const seed = parseLegacyList(JSON.parse(readFileSync(new URL('../../../web/public/videos.json', import.meta.url), 'utf8')))
+    expect(seed).toHaveLength(65)
+    expect(Object.keys(LEGACY_EMOJI).length).toBeGreaterThan(5)
+    const doc = parseLegacyList({ version: 2, videos: [{ id: 'aaaaaaaaaaa', title: 't', category: 'c', hidden: true }, { id: 'bad', title: 't', category: 'c' }] })
+    expect(doc.map((v) => v.id)).toEqual(['aaaaaaaaaaa'])
+  })
+})
