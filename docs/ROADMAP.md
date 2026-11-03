@@ -226,8 +226,8 @@ All input validated with zod schemas from `packages/shared`.
 - [x] Parent roles (owner / parent); member management
 - [x] Turkish / English kids' UI (i18n; console still English); categories remain family-defined
 - [x] Family data export + delete
-- [ ] Onboarding: empty family → create first kid profile → add first videos
-      (optional starter-pack suggestions, never copied from another family)
+- [x] Onboarding: 'Get started' checklist for an empty family
+- [ ] Optional starter-pack suggestions (never copied from another family)
 
 ### Phase 4 — Extras (pick as needed)
 - [x] Separate lists per kid profile (category restriction per profile)

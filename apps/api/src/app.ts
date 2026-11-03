@@ -55,6 +55,19 @@ export async function buildApp(opts: BuildOptions): Promise<{ app: FastifyInstan
   })
   app.setErrorHandler(errorHandler)
 
+  // Defense in depth against cross-site requests (cookies are SameSite=Lax
+  // already): a state-changing API call that says it comes from another
+  // website is refused. Requests without an Origin header (same-origin GETs,
+  // server-to-server, curl) are unaffected.
+  const appOrigin = new URL(config.BASE_URL).origin
+  app.addHook('onRequest', async (req, reply) => {
+    if (!req.url.startsWith('/api/v1/') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return
+    const origin = req.headers.origin
+    if (origin && origin !== appOrigin) {
+      return reply.status(403).send({ error: { code: 'bad_origin', message: 'Cross-site request refused' } })
+    }
+  })
+
   // Better Auth handles /api/auth/* (sign-up/in/out, sessions, password reset).
   app.route({
     method: ['GET', 'POST'],

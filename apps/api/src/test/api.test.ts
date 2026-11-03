@@ -354,3 +354,15 @@ describe('nightly availability check', () => {
     expect((await feedIds()).sort()).toEqual(['lllllllllll', 'mmmmmmmmmmm'])
   })
 })
+
+describe('cross-site requests', () => {
+  it('refuses state-changing API calls from another origin, even with a valid session', async () => {
+    const c = new Client(h)
+    await c.signIn(ADMIN_EMAIL)
+    const evil = await c.req('POST', '/api/v1/families', { name: 'From evil.com' }, { origin: 'https://evil.example' })
+    expect(evil.status).toBe(403)
+    expect(evil.body.error.code).toBe('bad_origin')
+    const ok = await c.req('POST', '/api/v1/families', { name: 'Same origin' })
+    expect(ok.status).toBe(201)
+  })
+})
