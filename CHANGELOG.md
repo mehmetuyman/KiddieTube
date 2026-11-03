@@ -67,7 +67,8 @@ The GitHub Pages build keeps working as before.
   - At most one password-link email per address every 2 minutes, from sign-up
     and "forgot password" (R3-2).
   - Password-link tokens and invitation ids are masked in API and nginx logs
-    (R3-3).
+    (R3-3), including `/parent?next=…` (R3-6) and nginx's error log for
+    password links when the API is down (R3-7).
   - Runbook for a Cloudflare Origin certificate + "Full (strict)", and an
     optional firewall-rule printer (R3-4, owner action).
   - The console signs out when its page closes on a paired device (R2-7);

@@ -9,10 +9,13 @@ describe('redactUrl [review R3-3]', () => {
     expect(redactUrl('/reset-password?token=AbC123&next=%2Fjoin')).toBe('/reset-password?[redacted]')
     expect(redactUrl('/join?invite=secret-token')).toBe('/join?[redacted]')
     expect(redactUrl('/accept?invitation=inv_123')).toBe('/accept?[redacted]')
+    // the "Sign in" link on those pages [review R3-6]
+    expect(redactUrl('/parent?next=%2Fjoin%3Finvite%3Dsecret-token')).toBe('/parent?[redacted]')
   })
 
   it('leaves everything else alone', () => {
     expect(redactUrl('/api/v1/feed')).toBe('/api/v1/feed')
+    expect(redactUrl('/parent')).toBe('/parent')
     expect(redactUrl('/api/v1/families/fam_1/videos?x=1')).toBe('/api/v1/families/fam_1/videos?x=1')
   })
 })

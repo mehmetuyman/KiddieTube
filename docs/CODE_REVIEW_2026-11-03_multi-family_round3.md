@@ -113,3 +113,38 @@ SSL mode **Full** with a self-signed origin certificate means Cloudflare accepts
 | R2-7 | The console registers a `pagehide` handler on paired devices that sends a sign-out beacon. Side effect, documented in ARCHITECTURE: on a kid's device, reloading the console (e.g. switching its language) asks for the password again. | server e2e: console reload → sign-in screen (fails with the handler disabled). The story now waits 10 s before its third sign-in, because Better Auth limits sign-ins per client. |
 
 **Also corrected:** the round-1 resolution said the H3 test fails without the fix. Re-checked on the full suite, it doesn't, because PGlite runs one transaction at a time. The round-1 file has a correction note. The R3-1 migration check above was run on the full suite.
+
+---
+
+## Reviewer verification of round 3
+
+- **State checked:** the **uncommitted** working tree on top of `e783728` (21 modified + 6 new files). Commit it before deploying; `deploy.sh` deploys commits only.
+- **Checks:**
+  - `npm run typecheck`, `npm run lint`: clean.
+  - `npm test`: API 49/49 (incl. `[R3-1]` ×3, `[R3-2]`), web 40/40.
+  - End-to-end, server mode: 3/3. GitHub Pages: 26 passed, 4 skipped.
+
+| ID | Status | Notes |
+|---|---|---|
+| R3-1 | **Fixed** | Explicit `kid_profile.all_categories`. Migration `0004` marks profiles that have links as restricted and runs the `UPDATE` in system mode, which is needed because the table owner is under `FORCE` RLS in production. The setting is reset afterwards, and a failed migration rolls it back with the transaction. In the feed, restricted with no links → `sql\`false\``, so no categories and no videos. Category delete reports `emptiedProfiles`; the list is computed before the delete, from profiles whose *only* category was this one. Older-client rule: an empty `categoryIds` alone keeps the current mode, so it never means "everything". Console: an "All categories" checkbox, a "will see no videos" warning, and a "No categories" label in the list. My original reproduction is now covered by `[R3-1]`. |
+| R3-2 | **Fixed** | `linkRecentlySent` matches Better Auth's storage (`password.mjs`: `identifier = reset-password:<token>`, `value = userId`). It applies to `/api/v1/signup` and to the proxied `request-password-reset`, and both answer as usual. (Two requests in the same millisecond could both send; that's harmless.) |
+| R3-3 | **Fixed** | `redactUrl` masks the token path and the query strings of `/join`, `/accept` and `/reset-password`. The Fastify `req` serializer logs only method, masked URL, host and IP. nginx has a `map` + `log_format` with the same masks and no Referer. |
+| R3-4 | **Documented (owner action)** | Origin CA + Full (strict) steps, and `deploy/cloudflare-ufw.sh`, which prints rules rather than applying them. That's appropriate, since it touches the shared `tinyapps.dev` setup. |
+| R3-5 | **Fixed** | |
+| R2-7 | **Fixed** | `pagehide` → `sendBeacon` sign-out while the console is open on a paired device. The e2e test covers it on Chromium. |
+
+**New nits (optional, no blocker):**
+
+- **R3-6.** Invite tokens can still reach the nginx log through `next`. The "Sign in" link on the join and accept pages goes to `/parent?next=%2Fjoin%3Finvite%3D<token>` (or `…accept%3Finvitation%3D<id>`). That URL is client-side only, but it is logged unmasked if the page is reloaded or opened directly. The impact is low, because both need the invited email to be used. To close it, add `~^/parent\?` → `"/parent?[redacted]"` to the nginx `map` and the same pattern to `redactUrl`.
+- **R3-7.** The nginx **error** log still records the full request line (with a reset token) when the upstream fails, e.g. the API is down while someone opens a password link. Accept this (rare, and the token expires in 1 h), or note it in the README.
+
+**To check on the phone (not testable here):** the `pagehide` beacon (R2-7) runs only in Chromium in the e2e suite. On the iPhone, open the console on a paired device, then close the app from the app switcher, reopen it and go to `/parent`: it should ask for the password. If iOS skips `pagehide` there, the kids'-page sign-out on reopen still covers it.
+
+**Verdict: round 3 is resolved.** Commit the working tree, then push and deploy for the phone test.
+
+### Resolution of R3-6 / R3-7
+
+| # | Status | Notes |
+|---|---|---|
+| R3-6 | **Fixed** | `/parent?…` is masked like the link pages, in the nginx `map` and in `redactUrl` (unit test added). |
+| R3-7 | **Fixed** | `location ^~ /api/auth/reset-password/` has its own `error_log … crit`. Upstream failures are logged at `error`, so a token in the request line no longer reaches the error log; other locations keep normal error logging. Same proxy settings as `/api/`. (Not run through `nginx -t` locally; the runbook runs it before reload.) |
