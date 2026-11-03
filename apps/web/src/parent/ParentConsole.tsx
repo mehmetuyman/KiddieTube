@@ -8,6 +8,7 @@ import { navigate, query, usePath } from '../router'
 import { CategoriesPage, DevicesPage, ProfilesPage, VideosPage } from './FamilyPages'
 import { AdminPage, MembersPage, SettingsPage } from './SettingsPages'
 import './console.css'
+import GetStarted from './GetStarted'
 
 export interface Me {
   user: { id: string; email: string; name: string; isAdmin: boolean }
@@ -125,6 +126,7 @@ function SignedIn({ me, path, reloadMe }: { me: Me; path: string; reloadMe: () =
   return (
     <Shell wide>
       <TopBar me={me} family={family} setFamilyId={setFamilyId} />
+      <GetStarted familyId={family.id} path={path} />
       <nav className="pc-nav">
         {PAGES.map((p) => (
           <button key={p.path} className={`pc-nav-btn ${p === page ? 'active' : ''}`} onClick={() => navigate(p.path)}>

@@ -221,7 +221,17 @@ function AddVideos({
   const act = useAction()
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
-  const [categoryId, setCategoryId] = useState<string | null>(categories[0]?.id ?? null)
+  const [categoryId, setCategoryIdState] = useState<string | null>(categories[0]?.id ?? null)
+  const [categoryTouched, setCategoryTouched] = useState(false)
+  const setCategoryId = (v: string | null) => {
+    setCategoryTouched(true)
+    setCategoryIdState(v)
+  }
+  // The form can open before the category list has loaded: default to the
+  // first category once it arrives, unless the parent already chose.
+  useEffect(() => {
+    if (!categoryTouched && categoryId === null && categories.length) setCategoryIdState(categories[0].id)
+  }, [categories, categoryId, categoryTouched])
   const [results, setResults] = useState<{ url: string; ok: boolean; error?: string }[] | null>(null)
   const [needTitle, setNeedTitle] = useState(false)
 

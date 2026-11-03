@@ -17,6 +17,9 @@ test('admin creates a family, adds content, pairs a device; the kids page works 
   await page.getByLabel('Family name').fill('Test Family')
   await page.getByRole('button', { name: 'Create family' }).click()
   await expect(page.getByText('No videos yet')).toBeVisible()
+  const getStarted = page.getByRole('complementary', { name: 'Get started' })
+  await expect(getStarted).toBeVisible()
+  await expect(getStarted.locator('li.done')).toHaveCount(0)
 
   // 3. A category, then a video into it (title looked up by the server)
   await page.locator('.pc-nav').getByRole('button', { name: /Categories/ }).click()
