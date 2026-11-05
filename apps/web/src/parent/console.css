@@ -277,3 +277,32 @@
   margin: 6px 0;
   font-size: 0.9rem;
 }
+
+/* "Set up this device" guide on the Kids page */
+.pc-setup-guide {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #eef5ff;
+  border: 1px solid #c9ddfb;
+  font-size: 0.95rem;
+}
+
+.pc-setup-guide ol {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.pc-setup-guide li {
+  padding: 3px 0;
+}
+
+.pc-setup-guide li.done {
+  color: #6b7280;
+  text-decoration: line-through;
+}
+
+.pc-setup-guide .pp-error,
+.pc-setup-guide .pc-setup-warning {
+  margin-top: 8px;
+}

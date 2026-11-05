@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Family } from '@kiddietube/shared'
 import { ApiRequestError, api, authApi } from '../server/api'
-import { here, navigate, nextPath, query, usePath } from '../router'
+import { currentPath, here, navigate, nextPath, query, usePath } from '../router'
+import PasswordInput from '../components/PasswordInput'
 import { CategoriesPage, DevicesPage, ProfilesPage, VideosPage } from './FamilyPages'
 import { AdminPage, MembersPage, SettingsPage } from './SettingsPages'
 import './console.css'
@@ -255,8 +256,9 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
     try {
       await authApi.signIn(email, password)
       await onDone()
-      // back to the invitation (etc.) that sent them here [review M3]
-      navigate(nextPath('/parent/videos'), { replace: true })
+      // back to the invitation (etc.) that sent them here [review M3], or to
+      // the console page this form was shown on (e.g. Kids, from "Set up this device")
+      navigate(nextPath(currentPath().startsWith('/parent/') ? here() : '/parent/videos'), { replace: true })
     } catch (err) {
       setError(err instanceof ApiRequestError && err.status === 401 ? c.wrongLogin : errorText(err))
     } finally {
@@ -285,9 +287,8 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
       </label>
       <label className="pp-field">
         <span>{c.password}</span>
-        <input
+        <PasswordInput
           className="pp-input"
-          type="password"
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -447,11 +448,11 @@ function ResetPassword({ onDone }: { onDone: () => Promise<void> }) {
       {error && <div className="pp-error">{error}</div>}
       <label className="pp-field">
         <span>{c.newPasswordLabel}</span>
-        <input className="pp-input" type="password" autoComplete="new-password" minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <PasswordInput autoComplete="new-password" minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} required />
       </label>
       <label className="pp-field">
         <span>{c.confirmPasswordLabel}</span>
-        <input className="pp-input" type="password" autoComplete="new-password" minLength={10} value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+        <PasswordInput autoComplete="new-password" minLength={10} value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
       </label>
       <button className="pp-btn pp-btn-primary" disabled={!token}>
         {c.savePassword}

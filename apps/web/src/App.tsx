@@ -387,7 +387,7 @@ function SetUpDevice() {
         <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="" className="pc-welcome-logo" />
         <h1>Kiddie Tube</h1>
         <p>{t.setupText}</p>
-        <button className="pp-btn pp-btn-primary" onClick={() => navigate('/parent/profiles')}>
+        <button className="pp-btn pp-btn-primary" onClick={() => navigate('/parent/profiles?setup=1')}>
           {t.setupButton}
         </button>
       </div>

@@ -120,6 +120,11 @@ const en = {
   profilesIntro:
     'Each kid profile has its own list (all categories, or just the ones you pick). Pair the phone or tablet you’re holding with a profile using “Use this device”.',
   addKid: '+ Add kid',
+  setupGuideTitle: 'Set up this device for a kid',
+  setupStepAddKid: 'Add your kid with “+ Add kid”.',
+  setupStepUseDevice: 'Tap “Use this device” on their card. This device then shows their videos, and you’re signed out here.',
+  setupNoVideos: 'There are no videos yet, so the kids’ screen will be empty. You can add them first, or later from any device.',
+  setupAddVideos: 'Add videos',
   allCategories: 'All categories',
   useThisDevice: 'Use this device',
   editProfile: (n: string) => `Edit ${n}`,
@@ -318,6 +323,11 @@ const tr: ConsoleStrings = {
   profilesIntro:
     'Her çocuk profilinin kendi listesi vardır (tüm kategoriler ya da yalnızca seçtikleriniz). Elinizdeki telefonu ya da tableti “Bu cihazda kullan” ile bir profile bağlayın.',
   addKid: '+ Çocuk ekle',
+  setupGuideTitle: 'Bu cihazı bir çocuk için kurun',
+  setupStepAddKid: 'Çocuğunuzu “+ Çocuk ekle” ile ekleyin.',
+  setupStepUseDevice: 'Çocuğun kartındaki “Bu cihazda kullan”a dokunun. Bu cihaz artık onun videolarını gösterir ve buradaki oturumunuz kapatılır.',
+  setupNoVideos: 'Henüz video yok, bu yüzden çocuk ekranı boş olacak. Videoları önce ekleyebilir ya da daha sonra herhangi bir cihazdan ekleyebilirsiniz.',
+  setupAddVideos: 'Video ekle',
   allCategories: 'Tüm kategoriler',
   useThisDevice: 'Bu cihazda kullan',
   editProfile: (n) => `${n} – düzenle`,

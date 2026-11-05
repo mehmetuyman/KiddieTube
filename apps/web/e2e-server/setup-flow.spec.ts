@@ -11,6 +11,12 @@ async function finishFromEmail(page: Page, email: string) {
   expect(mail, `password link for ${email}`).toBeTruthy()
   await page.goto(/https?:\/\/\S+reset-password\S+/.exec(mail!.text)![0])
   await page.getByLabel('Password (at least 10 characters)').fill('correct-horse-battery')
+  // the eye button shows what was typed, and hides it again
+  const newPassword = page.getByLabel('Password (at least 10 characters)')
+  await page.getByRole('button', { name: 'Show password' }).first().click()
+  await expect(newPassword).toHaveAttribute('type', 'text')
+  await page.getByRole('button', { name: 'Hide password' }).click()
+  await expect(newPassword).toHaveAttribute('type', 'password')
   await page.getByLabel('Confirm password').fill('correct-horse-batterz')
   await page.getByRole('button', { name: 'Save password' }).click()
   await expect(page.getByText("The passwords don't match.")).toBeVisible()
@@ -25,7 +31,7 @@ async function finishFromEmail(page: Page, email: string) {
 async function signIn(page: Page, email: string) {
   await page.goto('./parent')
   await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill('correct-horse-battery')
+  await page.getByLabel('Password', { exact: true }).fill('correct-horse-battery')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 }
 
@@ -50,6 +56,14 @@ test('admin creates a family, adds content, pairs a device; the kids page works 
   const getStarted = page.getByRole('complementary', { name: 'Get started' })
   await expect(getStarted).toBeVisible()
   await expect(getStarted.locator('li.done')).toHaveCount(0)
+
+  // "Set up this device" on the (unpaired) kids' page leads to Kids with a guide
+  await page.goto('./')
+  await page.getByRole('button', { name: 'Set up this device (parents)' }).click()
+  const guide = page.getByRole('complementary', { name: 'Set up this device for a kid' })
+  await expect(guide).toBeVisible()
+  await expect(guide.locator('li.done')).toHaveCount(0)
+  await expect(guide.getByText('There are no videos yet')).toBeVisible()
 
   // 3. A category, then a video into it (title looked up by the server)
   await page.locator('.pc-nav').getByRole('button', { name: /Categories/ }).click()

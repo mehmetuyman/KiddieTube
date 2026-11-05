@@ -1652,3 +1652,34 @@ body.pseudo-fullscreen .update-banner {
 .status-badge.text-bg-secondary { background-color: #6c757d; color: #fff; }
 .status-badge.text-bg-info { background-color: #0dcaf0; color: #000; }
 .status-badge.text-bg-primary { background-color: #0d6efd; color: #fff; }
+
+/* Password field with a show/hide button (components/PasswordInput.tsx) */
+.pp-password {
+  position: relative;
+  display: block;
+}
+
+.pp-password .pp-input {
+  padding-right: 48px;
+}
+
+.pp-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.pp-password-toggle:hover,
+.pp-password-toggle[aria-pressed='true'] {
+  color: #4a90e2;
+}

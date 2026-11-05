@@ -7,6 +7,7 @@ import { getPairing, revokeDevice, savePairing, syncFeed } from '../server/devic
 import { THEMES } from '../lib/theme'
 import { thumbUrl } from '../lib/videoStore'
 import { errorText, type Me } from './ParentConsole'
+import { navigate, query } from '../router'
 import { c, fmtDateTime } from './strings'
 import { IMPORT_MAX_LINKS } from '@kiddietube/shared/constants'
 import { themeName } from '../lib/i18n'
@@ -480,6 +481,9 @@ export function ProfilesPage({ familyId }: PageProps) {
   const act = useAction()
   const [editing, setEditing] = useState<KidProfile | 'new' | null>(null)
   const pairing = getPairing()
+  // Opened from "Set up this device" on an unpaired device: walk the parent through it
+  const setup = query('setup') !== null && !pairing
+  const videos = useResource(() => (setup ? api.get<Video[]>(`/families/${familyId}/videos`) : Promise.resolve(null)), [familyId, setup])
 
   /**
    * Pair the device in hand. Afterwards the parent is signed out HERE: it's
@@ -519,6 +523,23 @@ export function ProfilesPage({ familyId }: PageProps) {
   return (
     <section>
       <Messages error={profiles.error ?? act.error} notice={act.notice} />
+      {setup && profiles.data && (
+        <aside className="pc-setup-guide" aria-label={c.setupGuideTitle}>
+          <strong>{c.setupGuideTitle}</strong>
+          <ol>
+            <li className={profiles.data.length > 0 ? 'done' : ''}>{c.setupStepAddKid}</li>
+            <li>{c.setupStepUseDevice}</li>
+          </ol>
+          {videos.data?.length === 0 && (
+            <p className="pc-setup-warning">
+              {c.setupNoVideos}{' '}
+              <button className="pp-btn pp-btn-ghost" onClick={() => navigate('/parent/videos')}>
+                {c.setupAddVideos}
+              </button>
+            </p>
+          )}
+        </aside>
+      )}
       <p className="pc-muted">
         {c.profilesIntro}
       </p>

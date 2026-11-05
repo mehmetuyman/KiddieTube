@@ -21,6 +21,7 @@ import {
 import { THEMES, DEFAULT_THEME, ThemeId, getTheme, setTheme } from '../lib/theme'
 import { getLang, setLang, t, themeName } from '../lib/i18n'
 import { p } from './parentPanelStrings'
+import PasswordInput from './PasswordInput'
 
 type Props = {
   open: boolean
@@ -615,9 +616,8 @@ export default function ParentPanel({
 
               <label className="pp-field">
                 <span>{p.tokenLabel}</span>
-                <input
+                <PasswordInput
                   className="pp-input"
-                  type="password"
                   value={token}
                   placeholder={p.tokenPh}
                   onChange={(e) => setToken(e.target.value)}

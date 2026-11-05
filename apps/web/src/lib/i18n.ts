@@ -30,6 +30,8 @@ const en = {
   maybeLater: 'Maybe Later',
   setupText: 'This device isn’t set up yet. A parent can set it up in a minute.',
   setupButton: 'Set up this device (parents)',
+  showPassword: 'Show password',
+  hidePassword: 'Hide password',
   otherCategory: 'Other',
 }
 
@@ -60,6 +62,8 @@ const tr: Dict = {
   maybeLater: 'Belki sonra',
   setupText: 'Bu cihaz henüz kurulmadı. Bir ebeveyn bir dakikada kurabilir.',
   setupButton: 'Bu cihazı kur (ebeveynler)',
+  showPassword: 'Şifreyi göster',
+  hidePassword: 'Şifreyi gizle',
   otherCategory: 'Diğer',
 }
 

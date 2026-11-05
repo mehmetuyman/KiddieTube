@@ -73,6 +73,10 @@ The GitHub Pages build keeps working as before.
     optional firewall-rule printer (R3-4, owner action).
   - The console signs out when its page closes on a paired device (R2-7);
     nits (R3-5).
+- **Easier first setup:** "Set up this device" opens the Kids page with a short
+  guide (add a kid, then "Use this device"; warns when there are no videos),
+  and signing in returns to the page it was opened on. Password fields have a
+  show/hide (eye) button, and choosing a password asks for it twice.
 - **Turkish and English everywhere,** chosen per device (defaults to the
   device language; switchable in the console header, Settings, and the
   on-device panel's Theme tab): kids' page, parent console, on-device parent
