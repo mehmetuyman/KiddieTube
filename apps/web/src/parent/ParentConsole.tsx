@@ -421,10 +421,12 @@ function AcceptInvite({ me, onDone }: { me: Me | null | undefined; onDone: () =>
 function ResetPassword({ onDone }: { onDone: () => Promise<void> }) {
   const token = query('token') ?? ''
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [done, setDone] = useState(false)
   const [error, setError] = useState<string | null>(query('error') ? c.resetInvalid : null)
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (password !== confirm) return setError(c.passwordsDontMatch)
     try {
       await authApi.resetPassword(token, password)
       setDone(true)
@@ -446,6 +448,10 @@ function ResetPassword({ onDone }: { onDone: () => Promise<void> }) {
       <label className="pp-field">
         <span>{c.newPasswordLabel}</span>
         <input className="pp-input" type="password" autoComplete="new-password" minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} required />
+      </label>
+      <label className="pp-field">
+        <span>{c.confirmPasswordLabel}</span>
+        <input className="pp-input" type="password" autoComplete="new-password" minLength={10} value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
       </label>
       <button className="pp-btn pp-btn-primary" disabled={!token}>
         {c.savePassword}

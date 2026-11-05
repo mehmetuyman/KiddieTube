@@ -64,6 +64,8 @@ const en = {
   passwordChanged: 'Password saved. Sign in to continue.',
   newPasswordTitle: 'Choose your password',
   newPasswordLabel: 'Password (at least 10 characters)',
+  confirmPasswordLabel: 'Confirm password',
+  passwordsDontMatch: "The passwords don't match.",
   savePassword: 'Save password',
   checkEmailTitle: 'Check your email',
   checkEmailText: (e: string) =>
@@ -263,6 +265,8 @@ const tr: ConsoleStrings = {
   passwordChanged: 'Şifre kaydedildi. Devam etmek için giriş yapın.',
   newPasswordTitle: 'Şifrenizi belirleyin',
   newPasswordLabel: 'Şifre (en az 10 karakter)',
+  confirmPasswordLabel: 'Şifreyi tekrar girin',
+  passwordsDontMatch: 'Şifreler eşleşmiyor.',
   savePassword: 'Şifreyi kaydet',
   checkEmailTitle: 'E-postanızı kontrol edin',
   checkEmailText: (e) =>
