@@ -118,9 +118,15 @@ before it:
 
 ```bash
 sudo systemctl stop kiddietube
-pg_restore --clean --if-exists -d "$DATABASE_URL" /var/backups/kiddietube/pre-deploy-<when>.dump
+sudo -u postgres pg_restore --clean --if-exists -d kiddietube /var/backups/kiddietube/pre-deploy-<when>.dump
 /opt/kiddietube/deploy/deploy.sh <previous tag or commit>
 ```
+
+Restore as `postgres`: row-level security is FORCE'd, and PostgreSQL refuses
+to load data (COPY) into such tables as the `kiddietube` role. The dump keeps
+the original owners, so the tables still belong to `kiddietube` afterwards.
+The nightly server backup dumps as `postgres` too, so its
+`db/kiddietube.dump` restores the same way.
 
 ## Cloudflare origin hardening (owner; affects all of tinyapps.dev)
 

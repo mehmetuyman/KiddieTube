@@ -59,7 +59,10 @@ DATABASE_URL=$(grep -E '^DATABASE_URL=' "$APP/.env" | tail -n 1 | cut -d= -f2- |
 # Migrations only go forward: keep a restorable copy from just before them
 # (deploy/README.md "Restore" says how to use it).
 mkdir -p /var/backups/kiddietube
-pg_dump -Fc "$DATABASE_URL" > "/var/backups/kiddietube/pre-deploy-$(date +%Y%m%d-%H%M%S).dump"
+# Row-level security is FORCE'd, so it applies to this (owner) role too and
+# a plain pg_dump refuses those tables. System mode is what the policies
+# allow for maintenance (as withSystem() does), so the dump has every family.
+PGOPTIONS="-c app.system=on" pg_dump --enable-row-security -Fc "$DATABASE_URL"   > "/var/backups/kiddietube/pre-deploy-$(date +%Y%m%d-%H%M%S).dump"
 ls -1t /var/backups/kiddietube/pre-deploy-*.dump | tail -n +6 | xargs -r rm -f
 log "Pre-deploy database backup taken"
 (cd apps/api && NODE_ENV=production node --env-file="$APP/.env" --import tsx src/db/migrate.ts)
