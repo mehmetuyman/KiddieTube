@@ -22,9 +22,20 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   exit 1
 fi
 
+git fetch --quiet --tags origin
+
+# Run the deploy steps of the version being deployed, from a copy: checkout
+# rewrites this file, and bash would go on reading the new file at the old
+# offset (the first fix to the pre-deploy dump never ran because of that).
+if [ -z "${KT_DEPLOY_COPY:-}" ]; then
+  copy=$(mktemp /tmp/kiddietube-deploy.XXXXXX)
+  git show "$REF:deploy/deploy.sh" > "$copy"
+  KT_DEPLOY_COPY=1 exec bash "$copy" "$REF"
+fi
+rm -f "$0" # the copy; bash keeps it open
+
 PREV=$(git rev-parse HEAD)
 log "=== Deploy $REF (current $PREV) ==="
-git fetch --quiet --tags origin
 git checkout --quiet --detach "$REF"
 NEW=$(git rev-parse HEAD)
 log "Checked out $NEW"
